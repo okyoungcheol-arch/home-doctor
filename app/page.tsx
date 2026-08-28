@@ -1,14 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { UploadPanel } from '@/components/UploadPanel';
 import { InterviewChat, type AnswerAttachment } from '@/components/InterviewChat';
 import { SpecialistCard } from '@/components/SpecialistCard';
 import { SynthesisReport } from '@/components/SynthesisReport';
+import { SpecialtySelector, type TriageSpecialty } from '@/components/SpecialtySelector';
 import { mergeQuestions, normalize, isSimilar, type QueuedQuestion } from '@/lib/interview/mergeQuestions';
 import type { SpecialistOpinion, SynthesisReport as SynthesisReportType } from '@/lib/ai/schemas';
 
-type Stage = 'upload' | 'analyzing' | 'interview' | 'synthesizing' | 'report';
+type Stage =
+  | 'upload'
+  | 'triaging'
+  | 'selecting-specialties'
+  | 'consulting'
+  | 'interview'
+  | 'synthesizing'
+  | 'report';
 
 // Hard cap on total questions asked in one interview, so a model that keeps re-emitting
 // follow-up questions (even after dedup) cannot keep the interview loop running forever.
@@ -51,6 +59,7 @@ function LoadingIndicator({ label }: { label: string }) {
 export default function Home() {
   const [stage, setStage] = useState<Stage>('upload');
   const [transcript, setTranscript] = useState('');
+  const [triageSpecialties, setTriageSpecialties] = useState<TriageSpecialty[]>([]);
   const [opinions, setOpinions] = useState<SpecialistOpinion[]>([]);
   const [queue, setQueue] = useState<QueuedQuestion[]>([]);
   const [answeredQuestions, setAnsweredQuestions] = useState<string[]>([]);
@@ -58,11 +67,16 @@ export default function Home() {
   const [emergencyFlags, setEmergencyFlags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Bumped by handleReset so any async handler still in flight (fetches can take up to
+  // maxDuration = 60s) can tell its own session has been abandoned and skip its setState calls.
+  const sessionIdRef = useRef(0);
+
   async function handleTranscribed(text: string) {
     setError(null);
     setTranscript(text);
     setAnsweredQuestions([]);
-    setStage('analyzing');
+    setStage('triaging');
+    const sessionId = sessionIdRef.current;
 
     try {
       const triageResponse = await fetch('/api/triage', {
@@ -72,18 +86,34 @@ export default function Home() {
       });
       if (!triageResponse.ok) throw new Error(await parseErrorMessage(triageResponse));
       const triageData = await triageResponse.json();
-      setEmergencyFlags(triageData.emergency?.matchedFlags ?? []);
+      if (sessionIdRef.current !== sessionId) return;
 
+      setEmergencyFlags(triageData.emergency?.matchedFlags ?? []);
+      setTriageSpecialties(triageData.specialties);
+      setStage('selecting-specialties');
+    } catch (err) {
+      if (sessionIdRef.current !== sessionId) return;
+      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      setStage('upload');
+    }
+  }
+
+  async function handleConfirmSpecialties(selectedIds: string[]) {
+    if (selectedIds.length === 0) return; // SpecialtySelector already disables confirm at 0; defense-in-depth only
+
+    setStage('consulting');
+    const sessionId = sessionIdRef.current;
+
+    try {
       const specialistsResponse = await fetch('/api/specialists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: text,
-          specialtyIds: triageData.specialties.map((s: { id: string }) => s.id),
-        }),
+        body: JSON.stringify({ transcript, specialtyIds: selectedIds }),
       });
       if (!specialistsResponse.ok) throw new Error(await parseErrorMessage(specialistsResponse));
       const specialistsData = await specialistsResponse.json();
+      if (sessionIdRef.current !== sessionId) return;
+
       const initialOpinions: SpecialistOpinion[] = specialistsData.opinions;
       const initialQueue = mergeQuestions(initialOpinions);
 
@@ -91,11 +121,12 @@ export default function Home() {
       setQueue(initialQueue);
 
       if (initialQueue.length === 0) {
-        await finishInterview(initialOpinions);
+        await finishInterview(initialOpinions, sessionId);
       } else {
         setStage('interview');
       }
     } catch (err) {
+      if (sessionIdRef.current !== sessionId) return;
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
       setStage('upload');
     }
@@ -108,6 +139,7 @@ export default function Home() {
     const specialtyId = current.askedBy[0].specialtyId;
     const priorOpinion = opinions.find((o) => o.specialtyId === specialtyId);
     if (!priorOpinion) return;
+    const sessionId = sessionIdRef.current;
 
     try {
       const response = await fetch('/api/interview', {
@@ -124,6 +156,7 @@ export default function Home() {
       });
       if (!response.ok) throw new Error(await parseErrorMessage(response));
       const data = await response.json();
+      if (sessionIdRef.current !== sessionId) return;
 
       if (data.emergency?.matchedFlags?.length) {
         setEmergencyFlags((prev) => Array.from(new Set([...prev, ...data.emergency.matchedFlags])));
@@ -161,17 +194,18 @@ export default function Home() {
 
       if (nextQueue.length === 0 || updatedAnswered.length >= MAX_TOTAL_QUESTIONS) {
         setQueue([]);
-        await finishInterview(updatedOpinions);
+        await finishInterview(updatedOpinions, sessionId);
       } else {
         setQueue(nextQueue);
       }
     } catch (err) {
+      if (sessionIdRef.current !== sessionId) return;
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
       setStage('upload');
     }
   }
 
-  async function finishInterview(finalOpinions: SpecialistOpinion[]) {
+  async function finishInterview(finalOpinions: SpecialistOpinion[], sessionId: number) {
     setStage('synthesizing');
     try {
       const response = await fetch('/api/synthesize', {
@@ -181,17 +215,43 @@ export default function Home() {
       });
       if (!response.ok) throw new Error(await parseErrorMessage(response));
       const data = await response.json();
+      if (sessionIdRef.current !== sessionId) return;
       setReport(data.report);
       setStage('report');
     } catch (err) {
+      if (sessionIdRef.current !== sessionId) return;
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
       setStage('upload');
     }
   }
 
+  function handleReset() {
+    sessionIdRef.current += 1; // must run first — invalidates any in-flight handler's next guard check
+    setStage('upload');
+    setTranscript('');
+    setTriageSpecialties([]);
+    setOpinions([]);
+    setQueue([]);
+    setAnsweredQuestions([]);
+    setReport(null);
+    setEmergencyFlags([]);
+    setError(null);
+  }
+
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
-      <h1 className="text-2xl font-bold">다중 전문의 AI 문진</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">다중 전문의 AI 문진</h1>
+        {stage !== 'upload' && (
+          <button
+            type="button"
+            onClick={handleReset}
+            className="rounded-8 bg-fill-normal px-3 py-1.5 text-sm"
+          >
+            처음으로
+          </button>
+        )}
+      </div>
 
       {error && <p className="text-sm text-status-negative">{error}</p>}
 
@@ -202,7 +262,13 @@ export default function Home() {
       )}
 
       {stage === 'upload' && <UploadPanel onComplete={handleTranscribed} />}
-      {stage === 'analyzing' && <LoadingIndicator label="전문의를 소집하는 중입니다..." />}
+      {stage === 'triaging' && <LoadingIndicator label="증상을 분석해 관련 전문분야를 찾는 중입니다..." />}
+
+      {stage === 'selecting-specialties' && (
+        <SpecialtySelector specialties={triageSpecialties} onConfirm={handleConfirmSpecialties} />
+      )}
+
+      {stage === 'consulting' && <LoadingIndicator label="전문의를 소집하는 중입니다..." />}
 
       {stage === 'interview' && (
         <>
