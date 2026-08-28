@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { InstallButton } from "@/components/InstallButton";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,6 +17,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "다중 전문의 AI 문진",
   description: "통화 녹음을 전사하고 여러 전문의 AI 에이전트가 문진해 종합 소견을 제공하는 개인용 프로토타입입니다.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "AI 문진",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0066FF",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -26,6 +36,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <DisclaimerBanner />
+        <div className="flex justify-end px-4 py-2">
+          <InstallButton />
+        </div>
         {children}
       </body>
     </html>
