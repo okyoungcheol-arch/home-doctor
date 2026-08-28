@@ -7,7 +7,7 @@ export function SynthesisReport({ report }: { report: SynthesisReportType }) {
       <p className="mt-2 text-sm">{report.overallImpression}</p>
 
       {report.redFlags.length > 0 && (
-        <div className="mt-4 rounded-8 bg-accent-red-bg p-3 text-sm text-status-negative">
+        <div className="mt-4 rounded-8 bg-accent-red-bg p-3 text-sm text-[var(--atomic-red-30)]">
           <strong>주의 신호:</strong> {report.redFlags.join(', ')}
         </div>
       )}
