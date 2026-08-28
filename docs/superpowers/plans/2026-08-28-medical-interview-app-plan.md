@@ -1521,6 +1521,8 @@ git commit -m "feat: add API routes wiring transcription, triage, specialists, i
 - Consumes: `QueuedQuestion`(Task 5), `SpecialistOpinion`/`SynthesisReport` 타입(Task 2).
 - Produces: 5개의 React 컴포넌트. Task 12(`app/page.tsx`, `app/layout.tsx`)가 이들을 조립한다.
 
+구현 전에 `design.md`(레포 루트)를 먼저 읽고 그 컴포넌트 패턴을 따를 것.
+
 이 태스크는 UI 컴포넌트이므로 자동화 유닛 테스트 대신 Task 12에서 브라우저로 수동 검증한다(디자인 스펙 7절 기준).
 
 - [ ] **Step 1: DisclaimerBanner 구현**
@@ -1529,7 +1531,7 @@ Create `components/DisclaimerBanner.tsx`:
 ```tsx
 export function DisclaimerBanner() {
   return (
-    <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
+    <div className="border-b border-status-cautionary bg-accent-orange-bg px-4 py-2 text-center text-sm text-status-cautionary">
       이 앱은 실제 의료 진단을 대체하지 않으며 학습·참고 목적입니다. 응급 증상이 있다면 즉시 119 또는 응급실을 방문하세요.
     </div>
   );
@@ -1575,7 +1577,7 @@ export function UploadPanel({ onComplete }: UploadPanelProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-gray-200 p-6">
+    <div className="flex flex-col gap-3 rounded-12 border border-line-normal bg-background-elevated p-6 shadow-sm">
       <h2 className="text-lg font-semibold">통화 녹음 파일 업로드</h2>
       <input
         type="file"
@@ -1584,8 +1586,8 @@ export function UploadPanel({ onComplete }: UploadPanelProps) {
         onChange={handleFileChange}
         className="text-sm"
       />
-      {status === 'uploading' && <p className="text-sm text-gray-500">전사 중입니다...</p>}
-      {status === 'error' && <p className="text-sm text-red-600">{errorMessage}</p>}
+      {status === 'uploading' && <p className="text-sm text-label-alternative">전사 중입니다...</p>}
+      {status === 'error' && <p className="text-sm text-status-negative">{errorMessage}</p>}
     </div>
   );
 }
@@ -1616,7 +1618,7 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
   const chunksRef = useRef<Blob[]>([]);
 
   if (!currentQuestion) {
-    return <p className="text-sm text-gray-500">모든 문진 질문에 답변했습니다.</p>;
+    return <p className="text-sm text-label-alternative">모든 문진 질문에 답변했습니다.</p>;
   }
 
   async function startRecording() {
@@ -1670,9 +1672,9 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-gray-200 p-6">
+    <div className="flex flex-col gap-4 rounded-12 border border-line-normal bg-background-elevated p-6 shadow-sm">
       <div>
-        <span className="text-xs font-medium text-blue-600">
+        <span className="text-xs font-medium text-primary-normal">
           {currentQuestion.askedBy.map((a) => a.specialtyName).join(', ')} 문진
         </span>
         <p className="mt-1 text-base font-medium">{currentQuestion.question}</p>
@@ -1683,31 +1685,31 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
         onChange={(event) => setText(event.target.value)}
         placeholder="답변을 입력하세요"
         rows={3}
-        className="rounded border border-gray-300 p-2 text-sm"
+        className="rounded-8 border border-line-normal p-2 text-sm"
       />
 
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={isRecording ? stopRecording : startRecording}
-          className="rounded bg-gray-100 px-3 py-1.5 text-sm"
+          className="rounded-8 bg-fill-normal px-3 py-1.5 text-sm"
         >
           {isRecording ? '녹음 중지' : '음성으로 답변'}
         </button>
 
-        <label className="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm">
+        <label className="cursor-pointer rounded-8 bg-fill-normal px-3 py-1.5 text-sm">
           사진/파일 첨부
           <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleFileChange} />
         </label>
 
-        {attachment && <span className="text-xs text-gray-500">{attachment.filename} 첨부됨</span>}
+        {attachment && <span className="text-xs text-label-alternative">{attachment.filename} 첨부됨</span>}
       </div>
 
       <button
         type="button"
         onClick={handleSubmit}
         disabled={isSubmitting || (!text.trim() && !attachment)}
-        className="self-end rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="self-end rounded-full bg-primary-normal px-4 py-2 text-sm font-medium text-static-white disabled:opacity-50"
       >
         답변 제출
       </button>
@@ -1724,14 +1726,14 @@ import type { SpecialistOpinion } from '@/lib/ai/schemas';
 
 export function SpecialistCard({ opinion }: { opinion: SpecialistOpinion }) {
   return (
-    <div className="rounded-lg border border-gray-200 p-4">
+    <div className="rounded-12 border border-line-normal bg-background-elevated p-4 shadow-sm">
       <h3 className="font-semibold">{opinion.specialtyName}</h3>
       <ul className="mt-2 space-y-2">
         {opinion.suspectedConditions.map((condition) => (
           <li key={condition.name} className="text-sm">
             <span className="font-medium">{condition.name}</span>
-            <span className="ml-2 text-gray-500">확신도 {Math.round(condition.confidence * 100)}%</span>
-            <p className="text-gray-600">{condition.rationale}</p>
+            <span className="ml-2 text-label-alternative">확신도 {Math.round(condition.confidence * 100)}%</span>
+            <p className="text-label-neutral">{condition.rationale}</p>
           </li>
         ))}
       </ul>
@@ -1746,12 +1748,12 @@ import type { SynthesisReport as SynthesisReportType } from '@/lib/ai/schemas';
 
 export function SynthesisReport({ report }: { report: SynthesisReportType }) {
   return (
-    <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
+    <div className="rounded-16 border-2 border-primary-normal bg-accent-blue-bg p-6 shadow-md">
       <h2 className="text-lg font-semibold">종합 소견</h2>
       <p className="mt-2 text-sm">{report.overallImpression}</p>
 
       {report.redFlags.length > 0 && (
-        <div className="mt-4 rounded bg-red-100 p-3 text-sm text-red-800">
+        <div className="mt-4 rounded-8 bg-accent-red-bg p-3 text-sm text-status-negative">
           <strong>주의 신호:</strong> {report.redFlags.join(', ')}
         </div>
       )}
@@ -1798,6 +1800,8 @@ git commit -m "feat: add UI components for upload, interview chat, and reports"
 
 **Interfaces:**
 - Consumes: 모든 이전 태스크의 컴포넌트/타입/API 라우트.
+
+구현 전에 `design.md`(레포 루트)를 먼저 읽고 그 컴포넌트 패턴을 따를 것.
 
 - [ ] **Step 1: layout.tsx에 배너 삽입**
 
@@ -1940,13 +1944,13 @@ export default function Home() {
       <h1 className="text-2xl font-bold">다중 전문의 AI 문진</h1>
 
       {emergencyFlags.length > 0 && (
-        <div className="rounded bg-red-100 p-4 text-sm font-medium text-red-800">
+        <div className="rounded-12 bg-accent-red-bg p-4 text-sm font-medium text-status-negative">
           응급 신호가 감지되었습니다: {emergencyFlags.join(', ')}. 즉시 119 또는 응급실을 방문하세요.
         </div>
       )}
 
       {stage === 'upload' && <UploadPanel onComplete={handleTranscribed} />}
-      {stage === 'analyzing' && <p className="text-sm text-gray-500">전문의를 소집하는 중입니다...</p>}
+      {stage === 'analyzing' && <p className="text-sm text-label-alternative">전문의를 소집하는 중입니다...</p>}
 
       {stage === 'interview' && (
         <>
@@ -1959,7 +1963,7 @@ export default function Home() {
         </>
       )}
 
-      {stage === 'synthesizing' && <p className="text-sm text-gray-500">종합 소견을 작성하는 중입니다...</p>}
+      {stage === 'synthesizing' && <p className="text-sm text-label-alternative">종합 소견을 작성하는 중입니다...</p>}
 
       {stage === 'report' && report && (
         <>
