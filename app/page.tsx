@@ -1,69 +1,157 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import { UploadPanel } from '@/components/UploadPanel';
+import { InterviewChat, type AnswerAttachment } from '@/components/InterviewChat';
+import { SpecialistCard } from '@/components/SpecialistCard';
+import { SynthesisReport } from '@/components/SynthesisReport';
+import { mergeQuestions, type QueuedQuestion } from '@/lib/interview/mergeQuestions';
+import type { SpecialistOpinion, SynthesisReport as SynthesisReportType } from '@/lib/ai/schemas';
+
+type Stage = 'upload' | 'analyzing' | 'interview' | 'synthesizing' | 'report';
 
 export default function Home() {
+  const [stage, setStage] = useState<Stage>('upload');
+  const [transcript, setTranscript] = useState('');
+  const [opinions, setOpinions] = useState<SpecialistOpinion[]>([]);
+  const [queue, setQueue] = useState<QueuedQuestion[]>([]);
+  const [report, setReport] = useState<SynthesisReportType | null>(null);
+  const [emergencyFlags, setEmergencyFlags] = useState<string[]>([]);
+
+  async function handleTranscribed(text: string) {
+    setTranscript(text);
+    setStage('analyzing');
+
+    const triageResponse = await fetch('/api/triage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript: text }),
+    });
+    const triageData = await triageResponse.json();
+    setEmergencyFlags(triageData.emergency?.matchedFlags ?? []);
+
+    const specialistsResponse = await fetch('/api/specialists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transcript: text,
+        specialtyIds: triageData.specialties.map((s: { id: string }) => s.id),
+      }),
+    });
+    const specialistsData = await specialistsResponse.json();
+    const initialOpinions: SpecialistOpinion[] = specialistsData.opinions;
+    const initialQueue = mergeQuestions(initialOpinions);
+
+    setOpinions(initialOpinions);
+    setQueue(initialQueue);
+
+    if (initialQueue.length === 0) {
+      await finishInterview(initialOpinions);
+    } else {
+      setStage('interview');
+    }
+  }
+
+  async function handleAnswer(answerText: string, attachment?: AnswerAttachment) {
+    const current = queue[0];
+    if (!current) return;
+
+    const specialtyId = current.askedBy[0].specialtyId;
+    const priorOpinion = opinions.find((o) => o.specialtyId === specialtyId);
+    if (!priorOpinion) return;
+
+    const response = await fetch('/api/interview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        specialtyId,
+        transcript,
+        priorOpinion,
+        question: current.question,
+        answerText,
+        attachment,
+      }),
+    });
+    const data = await response.json();
+
+    if (data.emergency?.matchedFlags?.length) {
+      setEmergencyFlags((prev) => Array.from(new Set([...prev, ...data.emergency.matchedFlags])));
+    }
+
+    const updatedOpinion: SpecialistOpinion = {
+      ...data.opinion,
+      specialtyId: priorOpinion.specialtyId,
+      specialtyName: priorOpinion.specialtyName,
+    };
+
+    const updatedOpinions = opinions.map((o) => (o.specialtyId === specialtyId ? updatedOpinion : o));
+    setOpinions(updatedOpinions);
+
+    const remainingQueue = queue.slice(1);
+    const freshQuestions = mergeQuestions([
+      {
+        specialtyId: updatedOpinion.specialtyId,
+        specialtyName: updatedOpinion.specialtyName,
+        followUpQuestions: updatedOpinion.followUpQuestions,
+      },
+    ]).filter((nq) => !remainingQueue.some((rq) => rq.question === nq.question));
+
+    const nextQueue = [...remainingQueue, ...freshQuestions];
+    setQueue(nextQueue);
+
+    if (nextQueue.length === 0) {
+      await finishInterview(updatedOpinions);
+    }
+  }
+
+  async function finishInterview(finalOpinions: SpecialistOpinion[]) {
+    setStage('synthesizing');
+    const response = await fetch('/api/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opinions: finalOpinions }),
+    });
+    const data = await response.json();
+    setReport(data.report);
+    setStage('report');
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+      <h1 className="text-2xl font-bold">다중 전문의 AI 문진</h1>
+
+      {emergencyFlags.length > 0 && (
+        <div className="rounded-12 bg-accent-red-bg p-4 text-sm font-medium text-status-negative">
+          응급 신호가 감지되었습니다: {emergencyFlags.join(', ')}. 즉시 119 또는 응급실을 방문하세요.
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+
+      {stage === 'upload' && <UploadPanel onComplete={handleTranscribed} />}
+      {stage === 'analyzing' && <p className="text-sm text-label-alternative">전문의를 소집하는 중입니다...</p>}
+
+      {stage === 'interview' && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {opinions.map((opinion) => (
+              <SpecialistCard key={opinion.specialtyId} opinion={opinion} />
+            ))}
+          </div>
+          <InterviewChat currentQuestion={queue[0] ?? null} onAnswer={handleAnswer} />
+        </>
+      )}
+
+      {stage === 'synthesizing' && <p className="text-sm text-label-alternative">종합 소견을 작성하는 중입니다...</p>}
+
+      {stage === 'report' && report && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {opinions.map((opinion) => (
+              <SpecialistCard key={opinion.specialtyId} opinion={opinion} />
+            ))}
+          </div>
+          <SynthesisReport report={report} />
+        </>
+      )}
+    </main>
   );
 }
