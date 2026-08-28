@@ -19,6 +19,7 @@ describe('POST /api/triage', () => {
 
     expect(response.status).toBe(200);
     expect(data.specialties[0].id).toBe('pulmonology');
+    expect(data.specialties[0].name).toBe('호흡기내과');
     expect(data.emergency.isEmergency).toBe(true);
   });
 

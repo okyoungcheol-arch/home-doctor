@@ -43,6 +43,8 @@ describe('runSpecialistFollowUp', () => {
     );
     const call = mockGenerateObject.mock.calls[0][0];
     expect(typeof call.prompt).toBe('string');
+    // The original transcript must not be re-embedded on follow-up calls (see specialist.ts).
+    expect(call.prompt).not.toContain('기침이 오래갑니다.');
   });
 
   it('sends a multimodal prompt when an attachment is provided', async () => {
@@ -61,5 +63,8 @@ describe('runSpecialistFollowUp', () => {
     expect(Array.isArray(call.prompt)).toBe(true);
     const prompt = call.prompt as PromptMessage[];
     expect(prompt[0].content[1].type).toBe('file');
+    // The original transcript must not be re-embedded on follow-up calls (see specialist.ts).
+    const textPart = prompt[0].content[0] as { type: string; text: string };
+    expect(textPart.text).not.toContain('피부에 발진이 있습니다.');
   });
 });
