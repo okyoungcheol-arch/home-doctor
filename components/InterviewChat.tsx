@@ -15,6 +15,7 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
   const [attachment, setAttachment] = useState<AnswerAttachment | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -23,7 +24,15 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
   }
 
   async function startRecording() {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    setErrorMessage(null);
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setErrorMessage('마이크 접근 권한이 필요합니다.');
+      return;
+    }
+
     const recorder = new MediaRecorder(stream);
     chunksRef.current = [];
     recorder.ondataavailable = (event) => chunksRef.current.push(event.data);
@@ -32,10 +41,13 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
       const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
       const formData = new FormData();
       formData.append('audio', blob, 'answer.webm');
-      const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
-      if (response.ok) {
+      try {
+        const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
+        if (!response.ok) throw new Error('음성 인식에 실패했습니다.');
         const data = await response.json();
         setText((prev) => (prev ? `${prev} ${data.text}` : data.text));
+      } catch {
+        setErrorMessage('음성 인식에 실패했습니다. 다시 시도해주세요.');
       }
     };
     recorder.start();
@@ -105,6 +117,8 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
 
         {attachment && <span className="text-xs text-label-alternative">{attachment.filename} 첨부됨</span>}
       </div>
+
+      {errorMessage && <p className="text-sm text-status-negative">{errorMessage}</p>}
 
       <button
         type="button"
