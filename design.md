@@ -72,16 +72,27 @@ HTML을 인자로 받아 폰트 `@font-face` 규칙과 색상/radius/shadow CSS 
 `@theme inline`은 `--font-wanted-sans: "Wanted Sans Variable", -apple-system, BlinkMacSystemFont, sans-serif;`로
 매핑되어 있고, `body`의 `font-family`가 이 토큰을 사용한다.
 
-## Task 11 UI 컴포넌트를 위한 사용 가이드 (아직 미구현, 권장사항)
+## `components/` UI 컴포넌트의 토큰 사용 현황
 
-`components/` 아래 UI 컴포넌트는 아직 만들어지지 않았다(계획 문서 Task 11). 만들어질 때 다음
-토큰 매핑을 권장한다 — 어디까지나 가이드이며 이미 구현된 컴포넌트를 설명하는 것이 아니다.
+`components/` 아래 UI 컴포넌트는 모두 구현되어 있다. 각 컴포넌트가 실제로 쓰는 토큰은 다음과 같다.
 
-- **전문의 확신도(confidence) 레벨 / 응급 심각도 표시**: `--color-status-positive`(양호/낮은 위험),
-  `--color-status-cautionary`(주의), `--color-status-negative`(위험/응급), `--color-status-info`(정보성)를
-  용도에 맞게 사용한다.
-- **응급 경고 배너**: 배경은 `--color-accent-red-bg`, 강조 텍스트/아이콘은 `--color-status-negative`
-  조합을 권장한다.
-- **`SpecialistCard` / `SynthesisReport` 카드**: 모서리는 `rounded-12` 또는 `rounded-16`, 그림자는
-  `shadow-sm`(평상시) 또는 `shadow-md`(강조 카드)를 권장한다.
-- **주요 액션 버튼**(예: 답변 제출, 파일 업로드 트리거): 알약형(`rounded-full`)을 권장한다.
+- **`DisclaimerBanner`**(`components/DisclaimerBanner.tsx`, 상시 노출 상단 배너): 배경
+  `--color-accent-orange-bg`, 테두리 `--color-status-cautionary`. 배너 텍스트 자체는 WCAG AA 대비
+  4.5:1을 만족해야 해서 `--color-status-cautionary`(주황 50단계, 밝은 주황 배경 위에서 대비 부족)
+  대신 더 어두운 atomic 토큰 `--atomic-orange-30`을 직접 사용한다(`text-[var(--atomic-orange-30)]`,
+  대비 약 5.07:1).
+- **응급 경고 배너**(`app/page.tsx`의 emergency 배너, `SynthesisReport`의 redFlags 박스): 배경은
+  `--color-accent-red-bg`. 여기도 같은 이유로 텍스트는 `--color-status-negative`(빨강 50단계) 대신
+  `--atomic-red-30`을 직접 사용한다(`text-[var(--atomic-red-30)]`, 대비 약 6.24:1). 일반 에러
+  메시지(`UploadPanel`, `InterviewChat`의 오류 문구)처럼 흰 배경 위에 놓이는 텍스트는 대비가 이미
+  충분하므로 `--color-status-negative`를 그대로 쓴다.
+- **`SpecialistCard` / `SynthesisReport` 카드**: 모서리는 `rounded-12`(`SpecialistCard`) /
+  `rounded-16`(`SynthesisReport`), 그림자는 `shadow-sm`(`SpecialistCard`) / `shadow-md`(강조 카드인
+  `SynthesisReport`), 테두리는 `border-line-normal`(`SpecialistCard`) 또는 강조를 위한
+  `border-2 border-primary-normal`(`SynthesisReport`)을 쓴다.
+- **`UploadPanel` / `InterviewChat`의 카드 컨테이너**: `rounded-12`, `border-line-normal`,
+  `bg-background-elevated`, `shadow-sm` 조합.
+- **주요 액션 버튼**(`InterviewChat`의 "답변 제출" 등): 알약형 `rounded-full` + `bg-primary-normal` +
+  `text-static-white`을 쓴다. 보조 버튼(음성 녹음, 파일 첨부 트리거)은 `rounded-8` + `bg-fill-normal`.
+- **확신도(confidence) 표시**: `SpecialistCard`는 확신도를 퍼센트 텍스트로만 표시하며
+  `--color-label-alternative`를 쓴다(상태색으로 위험도를 구분하는 것은 계획 문서 범위 밖).
