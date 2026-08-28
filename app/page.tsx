@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { UploadPanel } from '@/components/UploadPanel';
 import { InterviewChat, type AnswerAttachment } from '@/components/InterviewChat';
 import { SpecialistCard } from '@/components/SpecialistCard';
@@ -22,6 +22,30 @@ async function parseErrorMessage(response: Response): Promise<string> {
     // response body wasn't JSON or didn't have an `error` field; fall through to generic message
   }
   return '요청 처리 중 오류가 발생했습니다.';
+}
+
+// Mounted only while its stage is active, so its internal counter naturally
+// starts fresh at 0 each time (no parent-managed reset state needed).
+function LoadingIndicator({ label }: { label: string }) {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    const start = Date.now();
+    const interval = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 text-sm text-label-alternative">
+      <span
+        aria-hidden
+        className="h-4 w-4 animate-spin rounded-full border-2 border-line-normal border-t-primary-normal"
+      />
+      <span>
+        {label} ({seconds}초 경과 — AI 모델 응답에 최대 1분 정도 걸릴 수 있습니다)
+      </span>
+    </div>
+  );
 }
 
 export default function Home() {
@@ -178,7 +202,7 @@ export default function Home() {
       )}
 
       {stage === 'upload' && <UploadPanel onComplete={handleTranscribed} />}
-      {stage === 'analyzing' && <p className="text-sm text-label-alternative">전문의를 소집하는 중입니다...</p>}
+      {stage === 'analyzing' && <LoadingIndicator label="전문의를 소집하는 중입니다..." />}
 
       {stage === 'interview' && (
         <>
@@ -191,7 +215,7 @@ export default function Home() {
         </>
       )}
 
-      {stage === 'synthesizing' && <p className="text-sm text-label-alternative">종합 소견을 작성하는 중입니다...</p>}
+      {stage === 'synthesizing' && <LoadingIndicator label="종합 소견을 작성하는 중입니다..." />}
 
       {stage === 'report' && report && (
         <>

@@ -1,5 +1,7 @@
 import { runSpecialistAnalysis } from '@/lib/agents/specialist';
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const body = await request.json();
   const transcript: string = typeof body.transcript === 'string' ? body.transcript : '';

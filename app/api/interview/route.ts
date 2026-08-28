@@ -1,6 +1,8 @@
 import { runSpecialistFollowUp } from '@/lib/agents/specialist';
 import { checkEmergency } from '@/lib/safety/emergencyCheck';
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const body = await request.json();
   const { specialtyId, transcript, priorOpinion, question, answerText, attachment } = body;
