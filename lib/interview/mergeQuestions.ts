@@ -7,8 +7,12 @@ export type QueuedQuestion = {
   askedBy: { specialtyId: string; specialtyName: string }[];
 };
 
-function normalize(text: string): string {
+export function normalize(text: string): string {
   return text.replace(/[\s.,?!~()]/g, '').toLowerCase();
+}
+
+export function isSimilar(a: string, b: string): boolean {
+  return a === b || a.includes(b) || b.includes(a);
 }
 
 export function mergeQuestions(
@@ -19,14 +23,7 @@ export function mergeQuestions(
   for (const opinion of opinions) {
     for (const followUp of opinion.followUpQuestions) {
       const normalized = normalize(followUp.question);
-      const existing = merged.find((item) => {
-        const itemNormalized = normalize(item.question);
-        return (
-          itemNormalized === normalized ||
-          itemNormalized.includes(normalized) ||
-          normalized.includes(itemNormalized)
-        );
-      });
+      const existing = merged.find((item) => isSimilar(normalize(item.question), normalized));
 
       if (existing) {
         existing.askedBy.push({ specialtyId: opinion.specialtyId, specialtyName: opinion.specialtyName });

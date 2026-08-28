@@ -5,10 +5,14 @@ import { UploadPanel } from '@/components/UploadPanel';
 import { InterviewChat, type AnswerAttachment } from '@/components/InterviewChat';
 import { SpecialistCard } from '@/components/SpecialistCard';
 import { SynthesisReport } from '@/components/SynthesisReport';
-import { mergeQuestions, type QueuedQuestion } from '@/lib/interview/mergeQuestions';
+import { mergeQuestions, normalize, isSimilar, type QueuedQuestion } from '@/lib/interview/mergeQuestions';
 import type { SpecialistOpinion, SynthesisReport as SynthesisReportType } from '@/lib/ai/schemas';
 
 type Stage = 'upload' | 'analyzing' | 'interview' | 'synthesizing' | 'report';
+
+// Hard cap on total questions asked in one interview, so a model that keeps re-emitting
+// follow-up questions (even after dedup) cannot keep the interview loop running forever.
+const MAX_TOTAL_QUESTIONS = 15;
 
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
@@ -25,6 +29,7 @@ export default function Home() {
   const [transcript, setTranscript] = useState('');
   const [opinions, setOpinions] = useState<SpecialistOpinion[]>([]);
   const [queue, setQueue] = useState<QueuedQuestion[]>([]);
+  const [answeredQuestions, setAnsweredQuestions] = useState<string[]>([]);
   const [report, setReport] = useState<SynthesisReportType | null>(null);
   const [emergencyFlags, setEmergencyFlags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +37,7 @@ export default function Home() {
   async function handleTranscribed(text: string) {
     setError(null);
     setTranscript(text);
+    setAnsweredQuestions([]);
     setStage('analyzing');
 
     try {
@@ -108,6 +114,11 @@ export default function Home() {
       const updatedOpinions = opinions.map((o) => (o.specialtyId === specialtyId ? updatedOpinion : o));
       setOpinions(updatedOpinions);
 
+      // The question just answered counts toward the total, whether or not the model echoes
+      // it back as a "new" follow-up question.
+      const updatedAnswered = [...answeredQuestions, normalize(current.question)];
+      setAnsweredQuestions(updatedAnswered);
+
       const remainingQueue = queue.slice(1);
       const freshQuestions = mergeQuestions([
         {
@@ -115,13 +126,20 @@ export default function Home() {
           specialtyName: updatedOpinion.specialtyName,
           followUpQuestions: updatedOpinion.followUpQuestions,
         },
-      ]).filter((nq) => !remainingQueue.some((rq) => rq.question === nq.question));
+      ]).filter((nq) => {
+        const nqNormalized = normalize(nq.question);
+        const alreadyAnswered = updatedAnswered.some((aq) => isSimilar(aq, nqNormalized));
+        const alreadyQueued = remainingQueue.some((rq) => isSimilar(normalize(rq.question), nqNormalized));
+        return !alreadyAnswered && !alreadyQueued;
+      });
 
       const nextQueue = [...remainingQueue, ...freshQuestions];
-      setQueue(nextQueue);
 
-      if (nextQueue.length === 0) {
+      if (nextQueue.length === 0 || updatedAnswered.length >= MAX_TOTAL_QUESTIONS) {
+        setQueue([]);
         await finishInterview(updatedOpinions);
+      } else {
+        setQueue(nextQueue);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
@@ -154,7 +172,7 @@ export default function Home() {
       {error && <p className="text-sm text-status-negative">{error}</p>}
 
       {emergencyFlags.length > 0 && (
-        <div className="rounded-12 bg-accent-red-bg p-4 text-sm font-medium text-status-negative">
+        <div className="rounded-12 bg-accent-red-bg p-4 text-sm font-medium text-[var(--atomic-red-30)]">
           응급 신호가 감지되었습니다: {emergencyFlags.join(', ')}. 즉시 119 또는 응급실을 방문하세요.
         </div>
       )}
