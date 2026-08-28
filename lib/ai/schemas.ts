@@ -7,8 +7,15 @@ export const suspectedConditionSchema = z.object({
 });
 
 export const followUpQuestionSchema = z.object({
-  question: z.string().describe('환자에게 물어볼 질문 (한국어, 존댓말)'),
-  reason: z.string().describe('이 질문이 필요한 이유'),
+  question: z.string().describe('환자에게 물어볼 질문. 반드시 한국어(존댓말)로만 작성'),
+  options: z
+    .array(z.string())
+    .min(2)
+    .max(5)
+    .describe(
+      '환자가 탭 한 번으로 고를 수 있는 짧은 답변 선택지 2~5개. 서로 겹치지 않고 실제 상황을 폭넓게 커버할 것. 반드시 한국어(존댓말 또는 자연스러운 응답체)로만 작성하고 영어를 섞지 말 것',
+    ),
+  reason: z.string().describe('이 질문이 필요한 이유. 반드시 한국어로만 작성'),
 });
 
 export const specialistFindingsSchema = z.object({

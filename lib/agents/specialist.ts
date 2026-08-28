@@ -16,7 +16,7 @@ export async function runSpecialistAnalysis(
     model: FAST_TEXT_MODEL,
     instructions: specialty.systemPrompt,
     schema: specialistFindingsSchema,
-    prompt: `다음은 환자와의 통화 녹음 전사문입니다. 이 내용을 바탕으로 ${specialty.name} 관점에서 1차 소견을 작성하세요.\n\n전사문:\n"""\n${transcript}\n"""`,
+    prompt: `다음은 환자와의 통화 녹음 전사문입니다. 이 내용을 바탕으로 ${specialty.name} 관점에서 1차 소견을 작성하세요.\n\n전사문:\n"""\n${transcript}\n"""\n\nfollowUpQuestions의 각 질문에는 반드시 환자가 탭 한 번으로 고를 수 있는 답변 선택지(options)를 2~5개 함께 제시하세요. 질문, 선택지, 이유는 예외 없이 한국어로만 작성하고 영어를 섞지 마세요.`,
   });
 
   return { ...object, specialtyId: specialty.id, specialtyName: specialty.name };
@@ -48,7 +48,7 @@ export async function runSpecialistFollowUp(
   const promptText =
     `이전 ${specialty.name} 소견의 의심 질환 및 근거:\n${JSON.stringify(priorOpinion.suspectedConditions)}\n\n` +
     `방금 받은 문진 답변:\n질문: ${answered.question}\n답변: ${answered.answerText}\n\n` +
-    `위 답변을 반영해 ${specialty.name} 소견을 갱신하세요. 이미 답변된 질문은 followUpQuestions에서 제외하고, 더 필요한 질문이 없다면 followUpQuestions를 빈 배열로 반환하세요.`;
+    `위 답변을 반영해 ${specialty.name} 소견을 갱신하세요. 이미 답변된 질문은 followUpQuestions에서 제외하고, 더 필요한 질문이 없다면 followUpQuestions를 빈 배열로 반환하세요. 새로 제시하는 각 질문에는 반드시 답변 선택지(options)를 2~5개 함께 제시하고, 질문·선택지·이유는 예외 없이 한국어로만 작성하세요.`;
 
   const prompt = answered.attachment
     ? [

@@ -303,6 +303,11 @@
   --shadow-xl: var(--shadow-xl);
 }
 
+html {
+  /* 어르신 접근성을 위해 기본 글자 크기를 살짝 키움 (기본 16px -> 18px, 약 12.5%) */
+  font-size: 18px;
+}
+
 body {
   font-family: var(--font-wanted-sans);
   background: var(--color-background-normal);

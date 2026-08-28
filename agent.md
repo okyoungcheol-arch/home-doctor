@@ -71,7 +71,7 @@ export const triageResultSchema = z.object({
 ```ts
 export const specialistFindingsSchema = z.object({
   suspectedConditions: z.array(suspectedConditionSchema).min(1).max(5), // { name, confidence(0~1), rationale }
-  followUpQuestions: z.array(followUpQuestionSchema).max(5),            // { question, reason }
+  followUpQuestions: z.array(followUpQuestionSchema).max(5),            // { question, options(2~5개), reason }
 });
 export type SpecialistFindings = z.infer<typeof specialistFindingsSchema>;
 

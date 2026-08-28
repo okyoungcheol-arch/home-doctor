@@ -69,7 +69,9 @@ describe('full transcribe -> triage -> specialists -> interview -> synthesize ch
     mockGenerateObject.mockImplementationOnce(async () => ({
       object: {
         suspectedConditions: [{ name: '천식', confidence: 0.5, rationale: '3주간 지속된 마른기침' }],
-        followUpQuestions: [{ question: '운동 시 숨이 차나요?', reason: '천식 여부 확인' }],
+        followUpQuestions: [
+          { question: '운동 시 숨이 차나요?', options: ['네, 심하게 차요', '약간 차요', '아니요'], reason: '천식 여부 확인' },
+        ],
       },
     }));
     mockGenerateObject.mockImplementationOnce(async () => ({

@@ -9,11 +9,17 @@ import sharp from 'sharp';
 const BRAND_BLUE = '#0066FF'; // --atomic-blue-50 / --color-primary-normal (app/globals.css)
 const OUT_DIR = path.join(process.cwd(), 'public', 'icons');
 
-function iconSvg({ size, glyphSize, glyphY, rounded }) {
+function iconSvg({ size, crossSize, rounded }) {
   const rx = rounded ? Math.round(size * 0.1875) : 0;
+  const center = size / 2;
+  const armLength = crossSize;
+  const armThickness = crossSize * 0.36;
   return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
   <rect width="${size}" height="${size}" rx="${rx}" fill="${BRAND_BLUE}"/>
-  <text x="${size / 2}" y="${glyphY}" font-family="Arial, sans-serif" font-size="${glyphSize}" font-weight="700" fill="#FFFFFF" text-anchor="middle">AI</text>
+  <g fill="#FFFFFF">
+    <rect x="${center - armThickness / 2}" y="${center - armLength / 2}" width="${armThickness}" height="${armLength}" rx="${armThickness * 0.2}"/>
+    <rect x="${center - armLength / 2}" y="${center - armThickness / 2}" width="${armLength}" height="${armThickness}" rx="${armThickness * 0.2}"/>
+  </g>
 </svg>`;
 }
 
@@ -25,11 +31,11 @@ async function renderPng(svg, size, filename) {
 
 async function main() {
   await mkdir(OUT_DIR, { recursive: true });
-  // Regular icon: rounded rect, glyph sized to look right in a normal (non-cropped) icon slot.
-  const regular512 = iconSvg({ size: 512, glyphSize: 280, glyphY: 330, rounded: true });
-  // Maskable icon: full-bleed square background + smaller glyph, so the glyph stays inside the
+  // Regular icon: rounded rect, cross sized to look right in a normal (non-cropped) icon slot.
+  const regular512 = iconSvg({ size: 512, crossSize: 260, rounded: true });
+  // Maskable icon: full-bleed square background + smaller cross, so it stays inside the
   // ~80% "safe zone" that maskable-icon-consuming launchers crop to (per the maskable icon spec).
-  const maskable512 = iconSvg({ size: 512, glyphSize: 200, glyphY: 300, rounded: false });
+  const maskable512 = iconSvg({ size: 512, crossSize: 190, rounded: false });
 
   await renderPng(regular512, 512, 'icon-512.png');
   await renderPng(regular512, 192, 'icon-192.png');

@@ -16,11 +16,21 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
   const [isRecording, setIsRecording] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showDirectInput, setShowDirectInput] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   if (!currentQuestion) {
     return <p className="text-sm text-label-alternative">모든 문진 질문에 답변했습니다.</p>;
+  }
+
+  async function handleSelectOption(option: string) {
+    setIsSubmitting(true);
+    try {
+      await onAnswer(option);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   async function startRecording() {
@@ -79,6 +89,7 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
       await onAnswer(text.trim(), attachment ?? undefined);
       setText('');
       setAttachment(null);
+      setShowDirectInput(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -93,41 +104,80 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
         <p className="mt-1 text-base font-medium">{currentQuestion.question}</p>
       </div>
 
-      <textarea
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        placeholder="답변을 입력하세요"
-        rows={3}
-        className="rounded-8 border border-line-normal p-2 text-sm"
-      />
+      {!showDirectInput && (
+        <div className="flex flex-col gap-3">
+          {currentQuestion.options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => handleSelectOption(option)}
+              disabled={isSubmitting}
+              className="rounded-12 border border-line-normal bg-background-elevated px-4 py-3 text-left text-base font-medium hover:bg-fill-normal disabled:opacity-50"
+            >
+              {option}
+            </button>
+          ))}
 
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={isRecording ? stopRecording : startRecording}
-          className="rounded-8 bg-fill-normal px-3 py-1.5 text-sm"
-        >
-          {isRecording ? '녹음 중지' : '음성으로 답변'}
-        </button>
+          <button
+            type="button"
+            onClick={() => setShowDirectInput(true)}
+            disabled={isSubmitting}
+            className="rounded-12 border border-dashed border-line-normal px-4 py-3 text-base text-label-alternative hover:bg-fill-normal disabled:opacity-50"
+          >
+            기타 (직접 입력)
+          </button>
+        </div>
+      )}
 
-        <label className="cursor-pointer rounded-8 bg-fill-normal px-3 py-1.5 text-sm">
-          사진/파일 첨부
-          <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleFileChange} />
-        </label>
+      {showDirectInput && (
+        <>
+          <textarea
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            placeholder="답변을 입력하세요"
+            rows={3}
+            className="rounded-8 border border-line-normal p-2 text-base"
+          />
 
-        {attachment && <span className="text-xs text-label-alternative">{attachment.filename} 첨부됨</span>}
-      </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={isRecording ? stopRecording : startRecording}
+              className="rounded-8 bg-fill-normal px-3 py-1.5 text-base"
+            >
+              {isRecording ? '녹음 중지' : '음성으로 답변'}
+            </button>
 
-      {errorMessage && <p className="text-sm text-status-negative">{errorMessage}</p>}
+            <label className="cursor-pointer rounded-8 bg-fill-normal px-3 py-1.5 text-base">
+              사진/파일 첨부
+              <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleFileChange} />
+            </label>
 
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={isSubmitting || (!text.trim() && !attachment)}
-        className="self-end rounded-full bg-primary-normal px-4 py-2 text-sm font-medium text-static-white disabled:opacity-50"
-      >
-        답변 제출
-      </button>
+            {attachment && <span className="text-sm text-label-alternative">{attachment.filename} 첨부됨</span>}
+          </div>
+
+          {errorMessage && <p className="text-sm text-status-negative">{errorMessage}</p>}
+
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowDirectInput(false)}
+              className="text-sm text-label-alternative underline"
+            >
+              선택지로 돌아가기
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting || (!text.trim() && !attachment)}
+              className="rounded-full bg-primary-normal px-4 py-2 text-base font-medium text-static-white disabled:opacity-50"
+            >
+              답변 제출
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -7,7 +7,9 @@ const { mockGenerateObject } = vi.hoisted(() => ({
   mockGenerateObject: vi.fn(async (_options: GenerateObjectCallArgs) => ({
     object: {
       suspectedConditions: [{ name: '천식', confidence: 0.5, rationale: '마른기침' }],
-      followUpQuestions: [{ question: '운동 시 숨이 차나요?', reason: '천식 확인' }],
+      followUpQuestions: [
+        { question: '운동 시 숨이 차나요?', options: ['네, 심하게 차요', '약간 차요', '아니요'], reason: '천식 확인' },
+      ],
     },
   })),
 }));

@@ -8,7 +8,11 @@ describe('specialistFindingsSchema', () => {
         { name: '천식', confidence: 0.6, rationale: '마른기침과 야간 악화' },
       ],
       followUpQuestions: [
-        { question: '운동 시 숨이 차나요?', reason: '천식 악화 요인 확인' },
+        {
+          question: '운동 시 숨이 차나요?',
+          options: ['네, 심하게 차요', '약간 차요', '아니요, 괜찮아요'],
+          reason: '천식 악화 요인 확인',
+        },
       ],
     });
     expect(result.success).toBe(true);

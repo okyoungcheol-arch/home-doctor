@@ -7,12 +7,20 @@ describe('mergeQuestions', () => {
       {
         specialtyId: 'pulmonology',
         specialtyName: '호흡기내과',
-        followUpQuestions: [{ question: '기침은 언제부터 시작됐나요?', reason: '기간 확인' }],
+        followUpQuestions: [
+          {
+            question: '기침은 언제부터 시작됐나요?',
+            options: ['오늘', '1~3일 전', '1주일 이상'],
+            reason: '기간 확인',
+          },
+        ],
       },
       {
         specialtyId: 'internal-medicine',
         specialtyName: '내과',
-        followUpQuestions: [{ question: '기침은 언제부터 시작됐나요?', reason: '증상 발생 시점' }],
+        followUpQuestions: [
+          { question: '기침은 언제부터 시작됐나요?', options: ['오늘', '1~3일 전', '1주일 이상'], reason: '증상 발생 시점' },
+        ],
       },
     ]);
 
@@ -29,8 +37,8 @@ describe('mergeQuestions', () => {
         specialtyId: 'pulmonology',
         specialtyName: '호흡기내과',
         followUpQuestions: [
-          { question: '기침은 언제부터 시작됐나요?', reason: 'A' },
-          { question: '가래에 피가 섞여 나오나요?', reason: 'B' },
+          { question: '기침은 언제부터 시작됐나요?', options: ['오늘', '1~3일 전', '1주일 이상'], reason: 'A' },
+          { question: '가래에 피가 섞여 나오나요?', options: ['네', '아니요'], reason: 'B' },
         ],
       },
     ]);

@@ -3,6 +3,7 @@ import type { SpecialistOpinion } from '@/lib/ai/schemas';
 export type QueuedQuestion = {
   id: string;
   question: string;
+  options: string[];
   reason: string;
   askedBy: { specialtyId: string; specialtyName: string }[];
 };
@@ -31,6 +32,7 @@ export function mergeQuestions(
         merged.push({
           id: globalThis.crypto.randomUUID(),
           question: followUp.question,
+          options: followUp.options,
           reason: followUp.reason,
           askedBy: [{ specialtyId: opinion.specialtyId, specialtyName: opinion.specialtyName }],
         });
