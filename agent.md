@@ -56,7 +56,13 @@ export const triageResultSchema = z.object({
 `id` 필드가 카탈로그의 id들로 만든 `z.enum`이기 때문에, `generateObject`가 스키마 검증을 강제하는
 한 모델은 카탈로그에 없는 전문분야를 지어낼 수 없다 — 목록 밖의 문자열을 반환하면 Zod 파싱이
 실패한다. 이렇게 트리아지 단계와 카탈로그가 같은 소스(`SPECIALTY_CATALOG`)에서 파생되므로 목록이
-바뀌어도 트리아지 코드를 손댈 필요가 없다.
+바뀌어도 트리아지 코드를 손댈 필요가 없다. `runTriage`는 분류 작업이라 품질 민감도가 낮아
+`FAST_TEXT_MODEL`(`lib/ai/models.ts`)로 호출한다.
+
+`app/api/triage/route.ts`는 `runTriage`가 반환한 `{id, reason}` 각각에 `getSpecialtyById(id).name`
+으로 한국어 이름을 채워 `{id, name, reason}`으로 응답한다. 이는 사용자가 트리아지 추천을 확인/선택하는
+`components/SpecialtySelector.tsx`(harness.md §3)가 카탈로그 전체(`systemPrompt` 텍스트 포함)를
+클라이언트로 가져오지 않고도 이름을 표시할 수 있게 하기 위함이다.
 
 ## `SpecialistFindings` / `SpecialistOpinion` 스키마와 병합 방식
 
@@ -84,7 +90,7 @@ export type SpecialistOpinion = SpecialistFindings & {
 // lib/agents/specialist.ts
 export async function runSpecialistAnalysis(specialtyId: string, transcript: string): Promise<SpecialistOpinion> {
   const specialty = getSpecialtyById(specialtyId);
-  // ... generateObject({ model: TEXT_MODEL, instructions: specialty.systemPrompt, schema: specialistFindingsSchema, prompt: ... })
+  // ... generateObject({ model: FAST_TEXT_MODEL, instructions: specialty.systemPrompt, schema: specialistFindingsSchema, prompt: ... })
   return { ...object, specialtyId: specialty.id, specialtyName: specialty.name };
 }
 ```
@@ -93,7 +99,11 @@ export async function runSpecialistAnalysis(specialtyId: string, transcript: str
 동일한 방식으로 동작한다 — 문진 답변 하나를 반영해 해당 전문의만 다시 호출하고, 응답에 다시
 `specialtyId`/`specialtyName`을 붙여 반환한다. `AnsweredQuestion`은 `{ question, answerText,
 attachment?: { data, mediaType, filename? } }` 형태이며, `attachment`가 있으면 텍스트와 파일이
-섞인 멀티모달 프롬프트로 호출한다.
+섞인 멀티모달 프롬프트로 호출한다. 이 함수도 `FAST_TEXT_MODEL`을 쓴다 — 세션당 최대 15회까지 호출될
+수 있는 고빈도 구간이기 때문이다. 문진 재호출(`runSpecialistFollowUp`)의 프롬프트는 매 라운드 전체
+전사문을 다시 포함하지 않는다 — 대신 `priorOpinion.suspectedConditions`(이전 소견과 근거, 라운드를
+거치며 누적됨)와 방금 받은 질문/답변만으로 소견을 갱신한다. `runSynthesis`(`lib/agents/synthesize.ts`)
+만은 세션당 1회 호출되는 최종 결과물이라 품질 우선 `TEXT_MODEL`을 그대로 쓴다.
 
 ## 안전 문구
 

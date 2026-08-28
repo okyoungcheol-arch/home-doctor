@@ -90,9 +90,21 @@ HTML을 인자로 받아 폰트 `@font-face` 규칙과 색상/radius/shadow CSS 
   `rounded-16`(`SynthesisReport`), 그림자는 `shadow-sm`(`SpecialistCard`) / `shadow-md`(강조 카드인
   `SynthesisReport`), 테두리는 `border-line-normal`(`SpecialistCard`) 또는 강조를 위한
   `border-2 border-primary-normal`(`SynthesisReport`)을 쓴다.
-- **`UploadPanel` / `InterviewChat`의 카드 컨테이너**: `rounded-12`, `border-line-normal`,
-  `bg-background-elevated`, `shadow-sm` 조합.
-- **주요 액션 버튼**(`InterviewChat`의 "답변 제출" 등): 알약형 `rounded-full` + `bg-primary-normal` +
-  `text-static-white`을 쓴다. 보조 버튼(음성 녹음, 파일 첨부 트리거)은 `rounded-8` + `bg-fill-normal`.
+- **`UploadPanel` / `InterviewChat` / `SpecialtySelector`의 카드 컨테이너**: `rounded-12`,
+  `border-line-normal`, `bg-background-elevated`, `shadow-sm` 조합 재사용. `SpecialtySelector`의
+  개별 전문분야 행은 `rounded-8 border-line-normal`.
+- **주요 액션 버튼**(`InterviewChat`의 "답변 제출", `SpecialtySelector`의 "문진 시작" 등): 알약형
+  `rounded-full` + `bg-primary-normal` + `text-static-white`을 쓴다. 보조 버튼(음성 녹음, 파일 첨부
+  트리거, "처음으로" 리셋 버튼, `InstallButton`의 "설치" 버튼)은 `rounded-8` + `bg-fill-normal`.
+  `SpecialtySelector`에서 0개 선택 시 뜨는 경고 문구는 흰 배경 위 일반 에러 문구 컨벤션과 동일하게
+  `text-status-negative`.
 - **확신도(confidence) 표시**: `SpecialistCard`는 확신도를 퍼센트 텍스트로만 표시하며
   `--color-label-alternative`를 쓴다(상태색으로 위험도를 구분하는 것은 계획 문서 범위 밖).
+- **`InstallButton`의 iOS 안내 팝오버**: 카드 컨테이너 컨벤션(`rounded-8 border-line-normal
+  bg-background-elevated shadow-md`)을 재사용한 작은 말풍선.
+
+## PWA 아이콘
+
+`public/icons/`의 매니페스트 아이콘 배경색은 `--atomic-blue-50`(`#0066FF`, `--color-primary-normal`과
+동일)을 사용한다. 주황 계열(`--color-status-cautionary`/`--color-accent-orange-bg`)은 이 디자인
+시스템에서 주의/경고 용도로 예약되어 있어(`DisclaimerBanner` 등) 앱 아이콘에는 사용하지 않는다.
