@@ -10,6 +10,16 @@ import type { SpecialistOpinion, SynthesisReport as SynthesisReportType } from '
 
 type Stage = 'upload' | 'analyzing' | 'interview' | 'synthesizing' | 'report';
 
+async function parseErrorMessage(response: Response): Promise<string> {
+  try {
+    const data = await response.json();
+    if (typeof data.error === 'string') return data.error;
+  } catch {
+    // response body wasn't JSON or didn't have an `error` field; fall through to generic message
+  }
+  return '요청 처리 중 오류가 발생했습니다.';
+}
+
 export default function Home() {
   const [stage, setStage] = useState<Stage>('upload');
   const [transcript, setTranscript] = useState('');
@@ -17,38 +27,47 @@ export default function Home() {
   const [queue, setQueue] = useState<QueuedQuestion[]>([]);
   const [report, setReport] = useState<SynthesisReportType | null>(null);
   const [emergencyFlags, setEmergencyFlags] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleTranscribed(text: string) {
+    setError(null);
     setTranscript(text);
     setStage('analyzing');
 
-    const triageResponse = await fetch('/api/triage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript: text }),
-    });
-    const triageData = await triageResponse.json();
-    setEmergencyFlags(triageData.emergency?.matchedFlags ?? []);
+    try {
+      const triageResponse = await fetch('/api/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: text }),
+      });
+      if (!triageResponse.ok) throw new Error(await parseErrorMessage(triageResponse));
+      const triageData = await triageResponse.json();
+      setEmergencyFlags(triageData.emergency?.matchedFlags ?? []);
 
-    const specialistsResponse = await fetch('/api/specialists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        transcript: text,
-        specialtyIds: triageData.specialties.map((s: { id: string }) => s.id),
-      }),
-    });
-    const specialistsData = await specialistsResponse.json();
-    const initialOpinions: SpecialistOpinion[] = specialistsData.opinions;
-    const initialQueue = mergeQuestions(initialOpinions);
+      const specialistsResponse = await fetch('/api/specialists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: text,
+          specialtyIds: triageData.specialties.map((s: { id: string }) => s.id),
+        }),
+      });
+      if (!specialistsResponse.ok) throw new Error(await parseErrorMessage(specialistsResponse));
+      const specialistsData = await specialistsResponse.json();
+      const initialOpinions: SpecialistOpinion[] = specialistsData.opinions;
+      const initialQueue = mergeQuestions(initialOpinions);
 
-    setOpinions(initialOpinions);
-    setQueue(initialQueue);
+      setOpinions(initialOpinions);
+      setQueue(initialQueue);
 
-    if (initialQueue.length === 0) {
-      await finishInterview(initialOpinions);
-    } else {
-      setStage('interview');
+      if (initialQueue.length === 0) {
+        await finishInterview(initialOpinions);
+      } else {
+        setStage('interview');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      setStage('upload');
     }
   }
 
@@ -60,65 +79,79 @@ export default function Home() {
     const priorOpinion = opinions.find((o) => o.specialtyId === specialtyId);
     if (!priorOpinion) return;
 
-    const response = await fetch('/api/interview', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        specialtyId,
-        transcript,
-        priorOpinion,
-        question: current.question,
-        answerText,
-        attachment,
-      }),
-    });
-    const data = await response.json();
+    try {
+      const response = await fetch('/api/interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          specialtyId,
+          transcript,
+          priorOpinion,
+          question: current.question,
+          answerText,
+          attachment,
+        }),
+      });
+      if (!response.ok) throw new Error(await parseErrorMessage(response));
+      const data = await response.json();
 
-    if (data.emergency?.matchedFlags?.length) {
-      setEmergencyFlags((prev) => Array.from(new Set([...prev, ...data.emergency.matchedFlags])));
-    }
+      if (data.emergency?.matchedFlags?.length) {
+        setEmergencyFlags((prev) => Array.from(new Set([...prev, ...data.emergency.matchedFlags])));
+      }
 
-    const updatedOpinion: SpecialistOpinion = {
-      ...data.opinion,
-      specialtyId: priorOpinion.specialtyId,
-      specialtyName: priorOpinion.specialtyName,
-    };
+      const updatedOpinion: SpecialistOpinion = {
+        ...data.opinion,
+        specialtyId: priorOpinion.specialtyId,
+        specialtyName: priorOpinion.specialtyName,
+      };
 
-    const updatedOpinions = opinions.map((o) => (o.specialtyId === specialtyId ? updatedOpinion : o));
-    setOpinions(updatedOpinions);
+      const updatedOpinions = opinions.map((o) => (o.specialtyId === specialtyId ? updatedOpinion : o));
+      setOpinions(updatedOpinions);
 
-    const remainingQueue = queue.slice(1);
-    const freshQuestions = mergeQuestions([
-      {
-        specialtyId: updatedOpinion.specialtyId,
-        specialtyName: updatedOpinion.specialtyName,
-        followUpQuestions: updatedOpinion.followUpQuestions,
-      },
-    ]).filter((nq) => !remainingQueue.some((rq) => rq.question === nq.question));
+      const remainingQueue = queue.slice(1);
+      const freshQuestions = mergeQuestions([
+        {
+          specialtyId: updatedOpinion.specialtyId,
+          specialtyName: updatedOpinion.specialtyName,
+          followUpQuestions: updatedOpinion.followUpQuestions,
+        },
+      ]).filter((nq) => !remainingQueue.some((rq) => rq.question === nq.question));
 
-    const nextQueue = [...remainingQueue, ...freshQuestions];
-    setQueue(nextQueue);
+      const nextQueue = [...remainingQueue, ...freshQuestions];
+      setQueue(nextQueue);
 
-    if (nextQueue.length === 0) {
-      await finishInterview(updatedOpinions);
+      if (nextQueue.length === 0) {
+        await finishInterview(updatedOpinions);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      setStage('upload');
     }
   }
 
   async function finishInterview(finalOpinions: SpecialistOpinion[]) {
     setStage('synthesizing');
-    const response = await fetch('/api/synthesize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opinions: finalOpinions }),
-    });
-    const data = await response.json();
-    setReport(data.report);
-    setStage('report');
+    try {
+      const response = await fetch('/api/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opinions: finalOpinions }),
+      });
+      if (!response.ok) throw new Error(await parseErrorMessage(response));
+      const data = await response.json();
+      setReport(data.report);
+      setStage('report');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      setStage('upload');
+    }
   }
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
       <h1 className="text-2xl font-bold">다중 전문의 AI 문진</h1>
+
+      {error && <p className="text-sm text-status-negative">{error}</p>}
 
       {emergencyFlags.length > 0 && (
         <div className="rounded-12 bg-accent-red-bg p-4 text-sm font-medium text-status-negative">
