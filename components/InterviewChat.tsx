@@ -17,6 +17,7 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showDirectInput, setShowDirectInput] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -25,6 +26,7 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
   }
 
   async function handleSelectOption(option: string) {
+    setSelectedOption(option);
     setIsSubmitting(true);
     try {
       await onAnswer(option);
@@ -106,17 +108,25 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
 
       {!showDirectInput && (
         <div className="flex flex-col gap-3">
-          {currentQuestion.options.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => handleSelectOption(option)}
-              disabled={isSubmitting}
-              className="rounded-12 border border-line-normal bg-background-elevated px-4 py-3 text-left text-base font-medium hover:bg-fill-normal disabled:opacity-50"
-            >
-              {option}
-            </button>
-          ))}
+          {currentQuestion.options.map((option) => {
+            const isSelected = selectedOption === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => handleSelectOption(option)}
+                disabled={isSubmitting}
+                className={
+                  isSelected
+                    ? 'flex items-center justify-between rounded-12 border-2 border-primary-normal bg-accent-blue-bg px-4 py-3 text-left text-base font-semibold text-primary-heavy disabled:opacity-100'
+                    : 'flex items-center justify-between rounded-12 border border-line-normal bg-background-elevated px-4 py-3 text-left text-base font-medium hover:bg-fill-normal disabled:opacity-50'
+                }
+              >
+                <span>{option}</span>
+                {isSelected && <span aria-hidden="true">✓</span>}
+              </button>
+            );
+          })}
 
           <button
             type="button"

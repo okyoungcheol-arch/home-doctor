@@ -277,7 +277,7 @@ export default function Home() {
               <SpecialistCard key={opinion.specialtyId} opinion={opinion} />
             ))}
           </div>
-          <InterviewChat currentQuestion={queue[0] ?? null} onAnswer={handleAnswer} />
+          <InterviewChat key={queue[0]?.id ?? 'done'} currentQuestion={queue[0] ?? null} onAnswer={handleAnswer} />
         </>
       )}
 
