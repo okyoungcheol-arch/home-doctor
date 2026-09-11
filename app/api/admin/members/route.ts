@@ -26,9 +26,7 @@ export async function PATCH(request: Request) {
   const client = await clerkClient();
 
   const memberships = await client.organizations.getOrganizationMembershipList({ organizationId });
-  const existing = memberships.data.find(
-    (m: { publicUserData?: { userId?: string } }) => m.publicUserData?.userId === userId,
-  );
+  const existing = memberships.data.find((m) => m.publicUserData?.userId === userId);
 
   const membership = existing
     ? await client.organizations.updateOrganizationMembership({ organizationId, userId, role })
