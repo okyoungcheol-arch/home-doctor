@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { InstallButton } from "@/components/InstallButton";
 import "./globals.css";
@@ -35,11 +36,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <DisclaimerBanner />
-        <div className="flex justify-end px-4 py-2">
-          <InstallButton />
-        </div>
-        {children}
+        <ClerkProvider>
+          <DisclaimerBanner />
+          <div className="flex justify-end px-4 py-2">
+            <InstallButton />
+          </div>
+          {children}
+        </ClerkProvider>
       </body>
     </html>
   );
