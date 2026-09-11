@@ -21,6 +21,7 @@ describe('POST /api/transcribe', () => {
 
     expect(response.status).toBe(200);
     expect(data.text).toBe('테스트 전사');
+    expect(data.kind).toBe('audio');
   });
 
   it('extracts text from an uploaded image file', async () => {
@@ -33,6 +34,7 @@ describe('POST /api/transcribe', () => {
 
     expect(response.status).toBe(200);
     expect(data.text).toBe('처방전 분석 결과');
+    expect(data.kind).toBe('document');
   });
 
   it('extracts text from an uploaded PDF file', async () => {
@@ -48,6 +50,7 @@ describe('POST /api/transcribe', () => {
 
     expect(response.status).toBe(200);
     expect(data.text).toBe('처방전 분석 결과');
+    expect(data.kind).toBe('document');
   });
 
   it('returns 400 for an unsupported file type', async () => {

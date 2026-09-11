@@ -2,8 +2,10 @@
 
 import { useRef, useState, type ChangeEvent } from 'react';
 
+type UploadKind = 'audio' | 'document';
+
 type UploadPanelProps = {
-  onComplete: (transcript: string) => void;
+  onComplete: (transcript: string, kind: UploadKind) => void;
 };
 
 export function UploadPanel({ onComplete }: UploadPanelProps) {
@@ -24,7 +26,7 @@ export function UploadPanel({ onComplete }: UploadPanelProps) {
       const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
       if (!response.ok) throw new Error('전사 요청이 실패했습니다.');
       const data = await response.json();
-      onComplete(data.text);
+      onComplete(data.text, data.kind as UploadKind);
       setStatus('idle');
     } catch (error) {
       setStatus('error');
