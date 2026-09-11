@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: '다중 전문의 AI 문진',
     short_name: 'AI 문진',
     description:
-      '통화 녹음을 전사하고 여러 전문의 AI 에이전트가 문진해 종합 소견을 제공하는 개인용 프로토타입입니다.',
+      '통화 녹음, 처방전 등 이미지·PDF 파일을 분석하고 여러 전문의 AI 에이전트가 문진해 종합 소견을 제공하는 개인용 프로토타입입니다.',
     lang: 'ko',
     start_url: '/',
     display: 'standalone',

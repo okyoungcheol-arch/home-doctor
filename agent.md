@@ -81,6 +81,11 @@ export type SpecialistOpinion = SpecialistFindings & {
 };
 ```
 
+`followUpQuestionSchema`의 `question`/`options`/`reason` 각 필드 `.describe()`에는 "맞춤법에 맞게 작성"
+지침이 포함되어 있다 — 모델이 생성하는 문진 질문/선택지에서 간헐적으로 발생하는 한글 맞춤법 오류(예:
+"만져집니다"를 "관져집니다"로 잘못 생성하는 경우)를 줄이기 위한 것이다. 완전히 막지는 못하지만 재발
+확률을 낮춘다.
+
 모델(`generateObject`)에게는 `specialistFindingsSchema`만 스키마로 전달한다 — 즉 모델은
 `suspectedConditions`와 `followUpQuestions`만 생성하고, `specialtyId`/`specialtyName`은 모델
 출력에 포함되지 않는다. 이 두 필드는 `lib/agents/specialist.ts`의 함수들이 호출부에서 이미 알고

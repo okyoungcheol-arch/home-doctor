@@ -13,7 +13,7 @@
 ## 7단계 파이프라인 개요
 
 ```
-[1] 전사(Transcription)
+[1] 전사/문서 분석(Transcription / Document Extraction)
       ↓
 [2] 트리아지 — 관련 전문분야 2~4개 추천
       ↓
@@ -30,11 +30,20 @@
 
 ## 단계별 구현 매핑
 
-### 1. 전사 (Transcription) — 구현됨
+### 1. 전사/문서 분석 (Transcription / Document Extraction) — 구현됨
 
-- `lib/ai/transcription.ts`의 `transcribeAudio(audio: Uint8Array | Buffer): Promise<TranscriptionOutput>`
-- 내부적으로 Vercel AI SDK의 `transcribe()`를 `lib/ai/models.ts`의 `TRANSCRIPTION_MODEL`로 호출한다.
-- `TranscriptionOutput`은 `{ text, language?, durationInSeconds? }` 형태.
+- `app/api/transcribe/route.ts`가 업로드된 파일의 MIME 타입으로 분기한다: `audio/*`는 전사, 이미지 또는
+  PDF는 문서 분석 경로로 보낸다.
+- 오디오: `lib/ai/transcription.ts`의 `transcribeAudio(audio: Uint8Array | Buffer): Promise<TranscriptionOutput>`.
+  내부적으로 Vercel AI SDK의 `transcribe()`를 `lib/ai/models.ts`의 `TRANSCRIPTION_MODEL`로 호출한다.
+  `TranscriptionOutput`은 `{ text, language?, durationInSeconds? }` 형태.
+- 이미지/PDF(처방전, 진단서 등): `lib/ai/documentExtraction.ts`의
+  `extractDocumentText(file: { data, mediaType, filename? }): Promise<DocumentExtractionOutput>`.
+  `generateText`를 `FAST_TEXT_MODEL`로 멀티모달(`{ type: 'file' }` 콘텐츠 파트) 호출해 문서에 적힌
+  증상·진단명·처방 약물 등을 한국어 텍스트로 정리한다. 반환 타입은 `{ text }`.
+- 두 경로 모두 결과의 `text`가 이후 파이프라인(트리아지 이하)에 "전사문" 자리에 그대로 전달되는 동일한
+  계약을 따른다 — 트리아지/전문의 프롬프트는 이 텍스트를 "환자 상담 내용"으로 지칭해 오디오/문서 중
+  어느 쪽에서 왔는지 구분하지 않는다.
 
 ### 2. 트리아지 — 구현됨
 
@@ -93,6 +102,10 @@
   `normalize`/`isSimilar`)로 이미 답변된 질문·현재 큐에 남은 질문 모두와 비교해 걸러진다. 그래도
   모델이 계속 새 질문을 만들어내는 극단적인 경우를 대비해 answeredQuestions 개수가
   `MAX_TOTAL_QUESTIONS`(15)에 도달하면 남은 큐와 무관하게 즉시 종합 단계로 강제 전환한다.
+- **응답 대기 피드백**: `components/LoadingIndicator.tsx`(스피너 + 경과 초 표시)는 원래 `app/page.tsx`에
+  단계 전환용으로만 쓰였으나, `InterviewChat`이 답변 제출 후 `/api/interview` 응답을 기다리는 동안
+  (`isSubmitting`)에도 동일 컴포넌트를 재사용해 보여준다. 이전에는 이 구간에서 버튼만 흐려지고 별도
+  피드백이 없어 실제 지연(최대 60초까지 걸릴 수 있는 LLM 호출)보다 훨씬 느리게 느껴지는 문제가 있었다.
 
 ### 7. 종합 — 구현됨
 
@@ -121,6 +134,11 @@
   즉시 화면에 노출한다. 실제로 `app/api/triage/route.ts`가 최초 전사문에, `app/api/interview/route.ts`가
   매 문진 답변에 이 함수를 호출하며, `app/page.tsx`가 두 라우트 응답의 `emergency.matchedFlags`를
   모아 응급 배너에 표시한다. 함수 자체의 유닛 테스트는 `tests/lib/emergencyCheck.test.ts`에 있다.
+- **응급 배너 UI**: `components/EmergencyBanner.tsx`가 `emergencyFlags` 배열을 받아 렌더링한다.
+  `matchedFlags`가 하나라도 있으면(최초 전사문에서 감지됐든 문진 도중 감지됐든 동일하게) 빨간 점
+  pulse 애니메이션(경고등 역할)과 매칭된 플래그 목록 안내 문구, `tel:119` 링크의 "119 전화하기"
+  버튼을 함께 보여준다 — 모바일에서 탭하면 전화 앱이 즉시 119로 연결된다. 조건 없이 모든 `Stage`에서
+  표시되므로, 문진 중간에 응급 신호가 잡혀도 화면 전환 없이 바로 노출된다.
 
 ## 세션 초기화 ("처음으로")
 

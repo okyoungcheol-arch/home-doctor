@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { UploadPanel } from '@/components/UploadPanel';
 import { InterviewChat, type AnswerAttachment } from '@/components/InterviewChat';
 import { SpecialistCard } from '@/components/SpecialistCard';
 import { SynthesisReport } from '@/components/SynthesisReport';
 import { SpecialtySelector, type TriageSpecialty } from '@/components/SpecialtySelector';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { EmergencyBanner } from '@/components/EmergencyBanner';
 import { mergeQuestions, normalize, isSimilar, type QueuedQuestion } from '@/lib/interview/mergeQuestions';
 import type { SpecialistOpinion, SynthesisReport as SynthesisReportType } from '@/lib/ai/schemas';
 
@@ -30,30 +32,6 @@ async function parseErrorMessage(response: Response): Promise<string> {
     // response body wasn't JSON or didn't have an `error` field; fall through to generic message
   }
   return '요청 처리 중 오류가 발생했습니다.';
-}
-
-// Mounted only while its stage is active, so its internal counter naturally
-// starts fresh at 0 each time (no parent-managed reset state needed).
-function LoadingIndicator({ label }: { label: string }) {
-  const [seconds, setSeconds] = useState(0);
-
-  useEffect(() => {
-    const start = Date.now();
-    const interval = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="flex items-center gap-2 text-sm text-label-alternative">
-      <span
-        aria-hidden
-        className="h-4 w-4 animate-spin rounded-full border-2 border-line-normal border-t-primary-normal"
-      />
-      <span>
-        {label} ({seconds}초 경과 — AI 모델 응답에 최대 1분 정도 걸릴 수 있습니다)
-      </span>
-    </div>
-  );
 }
 
 export default function Home() {
@@ -255,11 +233,7 @@ export default function Home() {
 
       {error && <p className="text-sm text-status-negative">{error}</p>}
 
-      {emergencyFlags.length > 0 && (
-        <div className="rounded-12 bg-accent-red-bg p-4 text-sm font-medium text-[var(--atomic-red-30)]">
-          응급 신호가 감지되었습니다: {emergencyFlags.join(', ')}. 즉시 119 또는 응급실을 방문하세요.
-        </div>
-      )}
+      <EmergencyBanner flags={emergencyFlags} />
 
       {stage === 'upload' && <UploadPanel onComplete={handleTranscribed} />}
       {stage === 'triaging' && <LoadingIndicator label="증상을 분석해 관련 전문분야를 찾는 중입니다..." />}

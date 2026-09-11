@@ -70,12 +70,12 @@ export function UploadPanel({ onComplete }: UploadPanelProps) {
 
   return (
     <div className="flex flex-col gap-3 rounded-12 border border-line-normal bg-background-elevated p-6 shadow-sm">
-      <h2 className="text-lg font-semibold">통화 녹음 업로드 또는 마이크 녹음</h2>
+      <h2 className="text-lg font-semibold">파일 업로드 또는 마이크 녹음</h2>
 
       <div className="flex flex-wrap items-center gap-3">
         <input
           type="file"
-          accept="audio/*"
+          accept="audio/*,image/*,.pdf,application/pdf"
           disabled={busy}
           onChange={handleFileChange}
           className="text-sm disabled:opacity-50"

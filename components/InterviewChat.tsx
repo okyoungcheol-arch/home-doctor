@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from 'react';
 import type { QueuedQuestion } from '@/lib/interview/mergeQuestions';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
 
 export type AnswerAttachment = { data: string; mediaType: string; filename?: string };
 
@@ -106,7 +107,9 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
         <p className="mt-1 text-base font-medium">{currentQuestion.question}</p>
       </div>
 
-      {!showDirectInput && (
+      {isSubmitting && <LoadingIndicator label="답변을 반영해 소견을 갱신하는 중입니다..." />}
+
+      {!isSubmitting && !showDirectInput && (
         <div className="flex flex-col gap-3">
           {currentQuestion.options.map((option) => {
             const isSelected = selectedOption === option;
@@ -139,7 +142,7 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
         </div>
       )}
 
-      {showDirectInput && (
+      {showDirectInput && !isSubmitting && (
         <>
           <textarea
             value={text}

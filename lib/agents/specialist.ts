@@ -16,7 +16,7 @@ export async function runSpecialistAnalysis(
     model: FAST_TEXT_MODEL,
     instructions: specialty.systemPrompt,
     schema: specialistFindingsSchema,
-    prompt: `다음은 환자와의 통화 녹음 전사문입니다. 이 내용을 바탕으로 ${specialty.name} 관점에서 1차 소견을 작성하세요.\n\n전사문:\n"""\n${transcript}\n"""\n\nfollowUpQuestions의 각 질문에는 반드시 환자가 탭 한 번으로 고를 수 있는 답변 선택지(options)를 2~5개 함께 제시하세요. 질문, 선택지, 이유는 예외 없이 한국어로만 작성하고 영어를 섞지 마세요.`,
+    prompt: `다음은 환자와의 상담 내용(통화 녹음 전사문 또는 첨부 문서에서 추출한 내용)입니다. 이 내용을 바탕으로 ${specialty.name} 관점에서 1차 소견을 작성하세요.\n\n상담 내용:\n"""\n${transcript}\n"""\n\nfollowUpQuestions의 각 질문에는 반드시 환자가 탭 한 번으로 고를 수 있는 답변 선택지(options)를 2~5개 함께 제시하세요. 질문, 선택지, 이유는 예외 없이 한국어로만 작성하고 영어를 섞지 마세요.`,
   });
 
   return { ...object, specialtyId: specialty.id, specialtyName: specialty.name };
