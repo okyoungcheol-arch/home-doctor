@@ -66,9 +66,15 @@ Clerk가 "회원정보(전화번호, 소속단체, 매니져여부)"의 단일 �
 |---|---|---|
 | 게스트 | Clerk 세션 없음 | 기존 클라이언트 state-only 파이프라인 그대로 사용. 서버 저장 API 호출 자체를 스킵 |
 | 일반 회원 | Clerk 세션 있음, org 역할 없음 | 본인 명의 `medical_records`만 조회/생성 |
-| 매니져 | Clerk 세션 + 해당 organization에서 커스텀 역할 `org:manager` | 소속 organizationId의 모든 `medical_records`를 일자별 **읽기 전용** 조회 |
+| 매니져 | Clerk 세션 + 해당 organization에서 `org:admin` 역할 | 소속 organizationId의 모든 `medical_records`를 일자별 **읽기 전용** 조회 |
 | 관리자(admin) | Clerk 사용자 `publicMetadata.role === 'admin'` | 단체(Organization) 생성, 회원의 단체 배정, 매니져 역할 임명/해제. 의료정보 열람 권한은 없음 |
 
+- **매니져 역할은 Clerk 커스텀 역할이 아니라 기본 제공 역할 `org:admin`을 재사용한다.** 원래는
+  커스텀 역할 `org:manager`를 새로 만들 계획이었으나, Clerk의 Custom roles 기능도 Pro 유료 플랜
+  전용임을 확인해(무료 플랜은 기본 역할 `org:admin`/`org:member` 2개만 지원) 방향을 바꿨다. 우리
+  시스템의 전역 admin(`publicMetadata.role === 'admin'`)과 Clerk org의 `org:admin` 역할은 이름만
+  같을 뿐 서로 다른 개념이므로 코드/문서에서 항상 "전역 admin"과 "조직 org:admin(=매니져)"으로
+  구분해 지칭한다.
 - 최초 admin은 로컬 1회성 스크립트(`scripts/seed-admin.ts`)가 Clerk Backend API로 지정된 이메일
   사용자에게 `publicMetadata.role = 'admin'`을 설정해 생성한다. 공개 엔드포인트로 노출하지 않는다.
 - 게스트 → 회원 전환 플로우는 이번 스펙 범위 밖이다. 게스트 세션은 매번 완전히 독립적이다.

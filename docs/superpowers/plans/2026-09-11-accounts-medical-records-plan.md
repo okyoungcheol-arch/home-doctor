@@ -44,6 +44,12 @@ Postgres(`@neondatabase/serverless`) + Drizzle(`drizzle-orm`, `drizzle-kit`), Zo
   전화번호는 회원가입 직후 "전화번호 등록" 화면(Task 9)에서 입력받아 `user.unsafeMetadata.phoneNumber`
   (일반 프로필 필드, Clerk의 검증된 식별자 아님)에 저장하고, `medical_records` 저장 시 이 값을
   스냅샷으로 복사한다. `scripts/seed-admin.ts`(Task 16)도 전화번호가 아니라 이메일로 사용자를 찾는다.
+- **매니져 역할은 `org:admin`(Clerk 기본 제공 역할)이지, 커스텀 역할 `org:admin`가 아니다.** Clerk의
+  Custom roles 기능도 Pro 유료 플랜 전용이라("Plan upgrade required" 안내로 확인됨), 무료 플랜에 원래
+  있는 두 org 역할(`org:admin`, `org:member`) 중 `org:admin`을 매니져로 재사용한다(스펙 §3). 이
+  `org:admin`은 Clerk **조직 범위** 역할이고, 우리 시스템의 **전역** admin(`publicMetadata.role ===
+  'admin'`)과는 완전히 다른 개념이다 — 코드에서 `getViewer()`가 이 둘을 구분해서 판별하므로 헷갈릴
+  일은 없지만, 커밋 메시지나 리뷰에서 언급할 때는 "조직 org:admin(매니져)"처럼 명시한다.
 
 ---
 
@@ -83,11 +89,15 @@ with email"과 Password 탭이 켜져 있는지 확인한다(둘 다 무료 플�
 phone"은 Clerk Pro 유료 플랜 전용이라, 로그인 식별자로 쓰지 않기로 했다(스펙 §2, Global Constraints
 참고). 전화번호는 Task 9의 "전화번호 등록" 화면에서 `unsafeMetadata`로 별도 수집한다.
 
-- [ ] **Step 5: Clerk 대시보드에서 Organizations 기능 및 커스텀 역할 활성화**
+- [ ] **Step 5: Clerk 대시보드에서 Organizations 기능 활성화**
 
-Clerk 대시보드 → Organizations → Settings에서 Organizations 기능을 켜고, Roles에서 커스텀 역할
-`org:manager`를 추가한다(기본 `org:admin`/`org:member`는 그대로 둔다 — 우리 시스템의 전역 admin과는
-다른 개념이므로 org 역할 이름 `org:admin`을 우리 admin으로 쓰지 않는다).
+Clerk 대시보드 → Organizations → Settings에서 "Enable organizations"를 누른다. **커스텀 역할은
+만들지 않는다** — Clerk의 Custom roles 기능도 Pro 유료 플랜 전용이라("Plan upgrade required" 안내로
+확인됨), 무료 플랜에 기본 제공되는 두 역할(`org:admin`, `org:member`) 중 `org:admin`을 그대로
+"매니져"로 재사용하기로 했다(Global Constraints 참고). 우리 시스템의 전역 admin
+(`publicMetadata.role === 'admin'`)과는 이름만 같을 뿐 별개 개념이므로 코드/커밋 메시지에서
+헷갈리지 않도록 "조직 org:admin(매니져)"처럼 구분해 부른다. Roles & Permissions 화면에서는 아무것도
+바꾸지 않는다.
 
 - [ ] **Step 6: Neon Postgres 통합 설치**
 
@@ -432,8 +442,8 @@ describe('getViewer', () => {
     expect(viewer.role).toBe('admin');
   });
 
-  it('returns manager role when orgRole is org:manager', async () => {
-    authMock.mockResolvedValue({ userId: 'user_2', orgId: 'org_1', orgRole: 'org:manager' });
+  it('returns manager role when orgRole is org:admin', async () => {
+    authMock.mockResolvedValue({ userId: 'user_2', orgId: 'org_1', orgRole: 'org:admin' });
     getUserMock.mockResolvedValue({ publicMetadata: {} });
     const viewer = await getViewer();
     expect(viewer.role).toBe('manager');
@@ -464,13 +474,13 @@ describe('requireAdmin', () => {
 
 describe('requireManager', () => {
   it('throws AuthorizationError when viewer has no organization', async () => {
-    authMock.mockResolvedValue({ userId: 'user_2', orgId: null, orgRole: 'org:manager' });
+    authMock.mockResolvedValue({ userId: 'user_2', orgId: null, orgRole: 'org:admin' });
     getUserMock.mockResolvedValue({ publicMetadata: {} });
     await expect(requireManager()).rejects.toThrow(AuthorizationError);
   });
 
   it('resolves when viewer is a manager with an organization', async () => {
-    authMock.mockResolvedValue({ userId: 'user_2', orgId: 'org_1', orgRole: 'org:manager' });
+    authMock.mockResolvedValue({ userId: 'user_2', orgId: 'org_1', orgRole: 'org:admin' });
     getUserMock.mockResolvedValue({ publicMetadata: {} });
     await expect(requireManager()).resolves.toMatchObject({ role: 'manager', organizationId: 'org_1' });
   });
@@ -526,7 +536,7 @@ export async function getViewer(): Promise<Viewer> {
   if (isAdmin) {
     return { role: 'admin', userId, organizationId: orgId ?? null };
   }
-  if (orgRole === 'org:manager') {
+  if (orgRole === 'org:admin') {
     return { role: 'manager', userId, organizationId: orgId ?? null };
   }
   return { role: 'member', userId, organizationId: orgId ?? null };
@@ -1931,9 +1941,9 @@ export default function DashboardPage() {
 
 - [ ] **Step 3: 수동 검증**
 
-Clerk 대시보드에서 테스트 계정에 조직 커스텀 역할 `org:manager`를 임시로 부여하고 로그인해
-`/dashboard`(루트 `/`에서 자동 리다이렉트)에서 표가 뜨는지 확인한다. 아직 저장된 레코드가 없다면
-Task 8~10을 거친 다른 회원 계정으로 문진을 한 번 완료해 데이터를 만든다.
+Clerk 대시보드에서 테스트 계정에 조직 역할 `org:admin`(매니져로 재사용 — Global Constraints 참고)을
+임시로 부여하고 로그인해 `/dashboard`(루트 `/`에서 자동 리다이렉트)에서 표가 뜨는지 확인한다. 아직
+저장된 레코드가 없다면 Task 8~10을 거친 다른 회원 계정으로 문진을 한 번 완료해 데이터를 만든다.
 
 - [ ] **Step 4: 커밋**
 
@@ -2082,7 +2092,7 @@ git commit -m "feat: add admin API to create organizations"
 - Consumes: `requireAdmin`(Task 4), Clerk `clerkClient().organizations`
   (`getOrganizationMembershipList`, `createOrganizationMembership`, `updateOrganizationMembership`)
 - Produces: `PATCH /api/admin/members` (body: `{ organizationId, userId, role: 'org:member' |
-  'org:manager' }` → `{ membership: { userId, organizationId, role } }`) — Task 15가 사용한다.
+  'org:admin' }` → `{ membership: { userId, organizationId, role } }`) — Task 15가 사용한다.
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
@@ -2131,26 +2141,26 @@ describe('PATCH /api/admin/members', () => {
 
   it('returns 403 when the caller is not admin', async () => {
     requireAdminMock.mockRejectedValue(new Error('not admin'));
-    const response = await PATCH(jsonRequest({ organizationId: 'org_1', userId: 'user_2', role: 'org:manager' }));
+    const response = await PATCH(jsonRequest({ organizationId: 'org_1', userId: 'user_2', role: 'org:admin' }));
     expect(response.status).toBe(403);
   });
 
   it('creates a new membership when the user is not yet a member', async () => {
     requireAdminMock.mockResolvedValue({ role: 'admin', userId: 'admin_1', organizationId: null });
     getOrganizationMembershipListMock.mockResolvedValue({ data: [] });
-    createOrganizationMembershipMock.mockResolvedValue({ role: 'org:manager' });
+    createOrganizationMembershipMock.mockResolvedValue({ role: 'org:admin' });
 
-    const response = await PATCH(jsonRequest({ organizationId: 'org_1', userId: 'user_2', role: 'org:manager' }));
+    const response = await PATCH(jsonRequest({ organizationId: 'org_1', userId: 'user_2', role: 'org:admin' }));
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(createOrganizationMembershipMock).toHaveBeenCalledWith({
       organizationId: 'org_1',
       userId: 'user_2',
-      role: 'org:manager',
+      role: 'org:admin',
     });
     expect(updateOrganizationMembershipMock).not.toHaveBeenCalled();
-    expect(data.membership).toEqual({ userId: 'user_2', organizationId: 'org_1', role: 'org:manager' });
+    expect(data.membership).toEqual({ userId: 'user_2', organizationId: 'org_1', role: 'org:admin' });
   });
 
   it('updates the role when the user is already a member', async () => {
@@ -2158,15 +2168,15 @@ describe('PATCH /api/admin/members', () => {
     getOrganizationMembershipListMock.mockResolvedValue({
       data: [{ publicUserData: { userId: 'user_2' }, role: 'org:member' }],
     });
-    updateOrganizationMembershipMock.mockResolvedValue({ role: 'org:manager' });
+    updateOrganizationMembershipMock.mockResolvedValue({ role: 'org:admin' });
 
-    const response = await PATCH(jsonRequest({ organizationId: 'org_1', userId: 'user_2', role: 'org:manager' }));
+    const response = await PATCH(jsonRequest({ organizationId: 'org_1', userId: 'user_2', role: 'org:admin' }));
 
     expect(response.status).toBe(200);
     expect(updateOrganizationMembershipMock).toHaveBeenCalledWith({
       organizationId: 'org_1',
       userId: 'user_2',
-      role: 'org:manager',
+      role: 'org:admin',
     });
     expect(createOrganizationMembershipMock).not.toHaveBeenCalled();
   });
@@ -2191,7 +2201,7 @@ import { requireAdmin } from '@/lib/server/auth/authorize';
 const assignMemberSchema = z.object({
   organizationId: z.string().min(1),
   userId: z.string().min(1),
-  role: z.enum(['org:member', 'org:manager']),
+  role: z.enum(['org:member', 'org:admin']),
 });
 
 export async function PATCH(request: Request) {
@@ -2262,7 +2272,7 @@ export function AdminPanel() {
 
   const [organizationId, setOrganizationId] = useState('');
   const [userId, setUserId] = useState('');
-  const [role, setRole] = useState<'org:member' | 'org:manager'>('org:manager');
+  const [role, setRole] = useState<'org:member' | 'org:admin'>('org:admin');
   const [memberResult, setMemberResult] = useState<string | null>(null);
   const [memberError, setMemberError] = useState<string | null>(null);
 
@@ -2347,10 +2357,10 @@ export function AdminPanel() {
         />
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value as 'org:member' | 'org:manager')}
+          onChange={(e) => setRole(e.target.value as 'org:member' | 'org:admin')}
           className="rounded-8 border border-line-normal p-2 text-sm"
         >
-          <option value="org:manager">매니져</option>
+          <option value="org:admin">매니져</option>
           <option value="org:member">일반 회원</option>
         </select>
         <button type="submit" className="self-end rounded-full bg-primary-normal px-4 py-2 text-sm font-medium text-static-white">
