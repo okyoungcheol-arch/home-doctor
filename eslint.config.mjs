@@ -35,6 +35,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Git worktrees under .claude/worktrees/** are separate checkouts with their own
+    // .next/node_modules — without this, eslint run from the repo root also lints their
+    // build output.
+    ".claude/**",
   ]),
 ]);
 
