@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "db:push": "dotenv -e .env.local -- drizzle-kit push"
+    "db:push": "dotenv -e .env.local -- drizzle-kit push",
+    "seed:admin": "dotenv -e .env.local -- tsx scripts/seed-admin.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.2",
@@ -31,6 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^4.1.11"
   }
