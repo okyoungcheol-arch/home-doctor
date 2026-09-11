@@ -92,7 +92,7 @@ Neon Postgres, Drizzle 스키마. 테이블은 `medical_records` 하나만 새�
 
 ## 5. 인증/인가 강제 지점
 
-- `middleware.ts`의 `clerkMiddleware`가 `/dashboard/**`(매니져), `/admin/**`, `/api/records/**`,
+- `proxy.ts`의 `clerkMiddleware`가 `/dashboard/**`(매니져), `/admin/**`, `/api/records/**`,
   `/api/admin/**`를 보호한다.
 - 매니져 조회 API는 클라이언트가 보낸 organizationId를 신뢰하지 않고, 서버에서 `auth()`로 얻은 실제
   소속단체로만 필터링한다.
@@ -119,7 +119,7 @@ app/(app)/                     ← 프론트엔드
   dashboard/page.tsx              매니져 대시보드 (일자별 목록, 중대성/특이사항 필터)
   admin/page.tsx                  관리자 화면 (단체 생성, 매니져 임명)
 
-middleware.ts                  clerkMiddleware + 보호 라우트 매처
+proxy.ts                  clerkMiddleware + 보호 라우트 매처
 ```
 
 경계 규칙: 컴포넌트/클라이언트 코드는 `lib/server/**`를 직접 import하지 않고 항상 `fetch('/api/...')`를

@@ -256,19 +256,23 @@ git commit -m "feat: add medical_records Drizzle schema and lazy DB client"
 
 ---
 
-## Task 3: Clerk 미들웨어와 Provider 연결
+## Task 3: Clerk Proxy와 Provider 연결
+
+Next.js 16에서 `middleware.ts` 파일 컨벤션은 deprecated되어 `proxy.ts`로 이름이 바뀌었다(동작은
+동일, 파일명과 익스포트 이름만 바뀜 — `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`
+참고). 이 프로젝트는 Next 16이므로 `middleware.ts`가 아니라 `proxy.ts`를 만든다.
 
 **Files:**
-- Create: `middleware.ts`
+- Create: `proxy.ts`
 - Modify: `app/layout.tsx`
 
 **Interfaces:**
 - Consumes: 없음 (Task 1에서 만든 `CLERK_SECRET_KEY`/`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` 환경변수)
 - Produces: 이후 모든 페이지에서 `@clerk/nextjs`의 `useUser()`/`auth()` 사용 가능
 
-- [ ] **Step 1: 미들웨어 작성**
+- [ ] **Step 1: Proxy 작성**
 
-`middleware.ts` (저장소 루트):
+`proxy.ts` (저장소 루트 — `middleware.ts`가 아니다):
 
 ```ts
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
@@ -363,8 +367,8 @@ npm run dev
 - [ ] **Step 4: 커밋**
 
 ```bash
-git add middleware.ts app/layout.tsx
-git commit -m "feat: wire up Clerk middleware and provider"
+git add proxy.ts app/layout.tsx
+git commit -m "feat: wire up Clerk proxy and provider"
 ```
 
 ---
