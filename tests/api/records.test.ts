@@ -63,6 +63,19 @@ describe('POST /api/records', () => {
     expect(response.status).toBe(400);
     expect(createRecordMock).not.toHaveBeenCalled();
   });
+
+  it('rejects invalid JSON', async () => {
+    requireMemberMock.mockResolvedValue({ role: 'member', userId: 'user_1', organizationId: 'org_1' });
+    const response = await POST(
+      new Request('http://localhost/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'not json',
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(createRecordMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/records', () => {
