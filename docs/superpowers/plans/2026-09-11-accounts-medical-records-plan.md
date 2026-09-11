@@ -2,10 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Clerk 기반 회원가입/로그인(전화번호+비밀번호), 역할(관리자/매니져/일반회원/게스트), Neon Postgres에
-문진 결과를 영구 저장하는 기능, 매니져 대시보드, 관리자 화면을 기존 7단계 문진 파이프라인 위에 얹는다.
+**Goal:** Clerk 기반 회원가입/로그인(이메일+비밀번호, 전화번호는 가입 후 프로필로 별도 등록), 역할
+(관리자/매니져/일반회원/게스트), Neon Postgres에 문진 결과를 영구 저장하는 기능, 매니져 대시보드,
+관리자 화면을 기존 7단계 문진 파이프라인 위에 얹는다.
 
-**Architecture:** Clerk가 회원정보(전화번호/소속단체/매니져여부)의 단일 진실 공급원이 된다. Neon
+**Architecture:** Clerk가 회원정보(이메일/전화번호/소속단체/매니져여부)의 단일 진실 공급원이 된다. Neon
 Postgres(Drizzle ORM)에는 `medical_records` 테이블 하나만 두고 의료정보(텍스트만, 원본 파일 없음)를
 저장한다. `lib/server/**`는 백엔드 전용 계층(클라이언트 컴포넌트에서 import 금지)이며, `app/api/**`
 라우트를 통해서만 접근한다. 기존 7단계 파이프라인 로직은 변경하지 않고, 문진 완료 시점에 저장 호출
@@ -38,6 +39,11 @@ Postgres(`@neondatabase/serverless`) + Drizzle(`drizzle-orm`, `drizzle-kit`), Zo
 - **범위 밖 UX 단순화**: 관리자가 매니져를 임명하려면 대상 회원의 Clerk User ID를 알아야 한다(Clerk
   대시보드에서 확인). 이번 범위에서는 회원 검색/목록 UI를 만들지 않는다 — 스펙에 명시되지 않은
   추가 기능이라 YAGNI.
+- **로그인 식별자는 이메일이지 전화번호가 아니다.** Clerk의 전화번호 식별자(SMS 기반 sign-up/sign-in)는
+  Pro 유료 플랜 전용이라, 무료 플랜을 유지하기 위해 이메일+비밀번호로 로그인하도록 바꿨다(스펙 §2).
+  전화번호는 회원가입 직후 "전화번호 등록" 화면(Task 9)에서 입력받아 `user.unsafeMetadata.phoneNumber`
+  (일반 프로필 필드, Clerk의 검증된 식별자 아님)에 저장하고, `medical_records` 저장 시 이 값을
+  스냅샷으로 복사한다. `scripts/seed-admin.ts`(Task 16)도 전화번호가 아니라 이메일로 사용자를 찾는다.
 
 ---
 
@@ -69,10 +75,13 @@ vercel integration add clerk --yes
 
 브라우저 인증/클레임 단계가 뜨면 완료할 때까지 기다린다(Connectable 통합).
 
-- [ ] **Step 4: Clerk 대시보드에서 전화번호+비밀번호 인증 활성화**
+- [ ] **Step 4: Clerk 대시보드에서 이메일+비밀번호 인증 확인**
 
-Clerk 대시보드 → User & Authentication → Email, Phone, Username에서 "Phone number"를 식별자로
-활성화하고, Password 전략을 활성화한다(이메일 식별자는 꺼도 된다).
+Clerk 대시보드 → Configure → User & authentication에서 Email 탭의 "Sign-up with email"/"Sign-in
+with email"과 Password 탭이 켜져 있는지 확인한다(둘 다 무료 플랜 기본값으로 이미 켜져 있을 가능성이
+높다 — 꺼져 있을 때만 켠다). **Phone 탭은 건드리지 않는다** — "Sign-up with phone"/"Sign-in with
+phone"은 Clerk Pro 유료 플랜 전용이라, 로그인 식별자로 쓰지 않기로 했다(스펙 §2, Global Constraints
+참고). 전화번호는 Task 9의 "전화번호 등록" 화면에서 `unsafeMetadata`로 별도 수집한다.
 
 - [ ] **Step 5: Clerk 대시보드에서 Organizations 기능 및 커스텀 역할 활성화**
 
@@ -95,10 +104,11 @@ vercel env pull .env.local --yes
 `.env.local`에 `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `DATABASE_URL`이 채워졌는지
 확인한다.
 
-- [ ] **Step 8: 시드 admin으로 쓸 전화번호 결정**
+- [ ] **Step 8: 시드 admin으로 쓸 이메일 결정**
 
-Task 16(seed-admin 스크립트)에서 이 전화번호로 최초 관리자를 지정한다. 팀/본인이 실제 로그인에 쓸
-전화번호를 정해 기록해 둔다(코드에는 커밋하지 않는다 — 스크립트 실행 시 인자로 전달).
+Task 16(seed-admin 스크립트)에서 이 이메일로 가입한 사용자를 최초 관리자로 지정한다(로그인 식별자가
+이메일이므로 — Global Constraints 참고). 팀/본인이 실제 로그인에 쓸 이메일을 정해 기록해 둔다
+(코드에는 커밋하지 않는다 — 스크립트 실행 시 인자로 전달).
 
 ---
 
@@ -280,6 +290,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
   '/admin(.*)',
+  '/complete-profile(.*)',
   '/api/records(.*)',
   '/api/dashboard(.*)',
   '/api/admin(.*)',
@@ -1079,7 +1090,10 @@ git commit -m "feat: distinguish audio vs document uploads via kind field"
   `InterviewApp`을 그대로 렌더링하는 클라이언트 페이지로 유지해 회귀 여부를 확인한다)
 
 **Interfaces:**
-- Consumes: `UploadPanel`의 새 `onComplete(transcript, kind)` 시그니처(Task 7)
+- Consumes: `UploadPanel`의 새 `onComplete(transcript, kind)` 시그니처(Task 7). `mode === 'member'`일
+  때 저장할 `phoneNumber`는 `useUser()`가 반환하는 `user.unsafeMetadata.phoneNumber`에서 읽는다 —
+  Task 10이 이 값이 없는 로그인 사용자를 `/complete-profile`(Task 9)로 먼저 보내므로, `InterviewApp`이
+  `mode="member"`로 렌더링되는 시점에는 항상 채워져 있다고 가정한다.
 - Produces: `InterviewApp({ mode: 'member' | 'guest' })` — Task 10의 라우팅 페이지들이 이 컴포넌트를
   `mode` prop과 함께 렌더링한다.
 
@@ -1300,7 +1314,7 @@ export function InterviewApp({ mode }: InterviewAppProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phoneNumber: user?.primaryPhoneNumber?.phoneNumber ?? '',
+          phoneNumber: (user?.unsafeMetadata?.phoneNumber as string | undefined) ?? '',
           prescriptionText: uploadKind === 'document' ? transcript : null,
           recordingText: uploadKind === 'audio' ? transcript : null,
           interviewRecord: { qaLog, opinions: finalOpinions, report: finalReport },
@@ -1453,10 +1467,14 @@ git commit -m "refactor: extract interview pipeline into InterviewApp with save-
 - Create: `app/sign-in/[[...sign-in]]/page.tsx`
 - Create: `app/sign-up/[[...sign-up]]/page.tsx`
 - Create: `app/guest/page.tsx`
+- Create: `components/CompleteProfileForm.tsx`
+- Create: `app/complete-profile/page.tsx`
 
 **Interfaces:**
 - Consumes: `InterviewApp`(Task 8)
-- Produces: `WelcomeScreen` 컴포넌트 — Task 10의 루트 페이지가 사용한다.
+- Produces: `WelcomeScreen` 컴포넌트 — Task 10의 루트 페이지가 사용한다. `CompleteProfileForm`이
+  로그인한 사용자의 `unsafeMetadata.phoneNumber`를 채우는 화면 — Task 10이 이 값이 없는 사용자를
+  `/complete-profile`로 리다이렉트한다.
 
 - [ ] **Step 1: `WelcomeScreen` 작성**
 
@@ -1547,7 +1565,84 @@ export default function GuestPage() {
 }
 ```
 
-- [ ] **Step 4: `.env.local`에 Clerk 라우팅 환경변수 추가**
+- [ ] **Step 4: 전화번호 등록 화면**
+
+Clerk의 로그인 식별자는 이메일이다(Global Constraints 참고) — 전화번호는 로그인에 쓰이지 않고,
+회원가입 직후 이 화면에서 한 번 입력받아 Clerk 사용자의 `unsafeMetadata.phoneNumber`에 저장한다.
+
+`components/CompleteProfileForm.tsx`:
+
+```tsx
+'use client';
+
+import { useState, type FormEvent } from 'react';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
+
+export function CompleteProfileForm() {
+  const { user } = useUser();
+  const router = useRouter();
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!user) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await user.update({ unsafeMetadata: { phoneNumber } });
+      router.push('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '저장에 실패했습니다.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
+      <h1 className="text-2xl font-bold">전화번호 등록</h1>
+      <p className="text-sm text-label-alternative">
+        의료정보 기록에 사용할 전화번호를 입력해주세요. 로그인에는 사용되지 않습니다.
+      </p>
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-3 rounded-12 border border-line-normal bg-background-elevated p-6 shadow-sm"
+      >
+        <input
+          type="tel"
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value)}
+          placeholder="010-1234-5678"
+          required
+          className="rounded-8 border border-line-normal p-2 text-sm"
+        />
+        <button
+          type="submit"
+          disabled={submitting}
+          className="self-end rounded-full bg-primary-normal px-4 py-2 text-sm font-medium text-static-white disabled:opacity-50"
+        >
+          저장
+        </button>
+        {error && <p className="text-sm text-status-negative">{error}</p>}
+      </form>
+    </main>
+  );
+}
+```
+
+`app/complete-profile/page.tsx`:
+
+```tsx
+import { CompleteProfileForm } from '@/components/CompleteProfileForm';
+
+export default function CompleteProfilePage() {
+  return <CompleteProfileForm />;
+}
+```
+
+- [ ] **Step 5: `.env.local`에 Clerk 라우팅 환경변수 추가**
 
 `.env.local`에 다음을 추가한다(이미 있는 `CLERK_SECRET_KEY`/`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` 아래에):
 
@@ -1556,20 +1651,22 @@ NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 ```
 
-- [ ] **Step 5: 수동 검증**
+- [ ] **Step 6: 수동 검증**
 
 ```bash
 npm run dev
 ```
 
-`/sign-up`에서 전화번호+비밀번호로 회원가입 → `/sign-in`에서 같은 정보로 로그인이 되는지 확인한다.
-`/guest`가 로그인 없이 기존 문진 화면을 그대로 보여주는지 확인한다.
+`/sign-up`에서 이메일+비밀번호로 회원가입 → `/sign-in`에서 같은 정보로 로그인이 되는지 확인한다.
+`/guest`가 로그인 없이 기존 문진 화면을 그대로 보여주는지 확인한다. `/complete-profile`에서 전화번호를
+저장하면 `/`로 돌아가는지 확인한다(Task 10 완료 전까지는 `/`가 아직 이 값을 확인하지 않으므로, 이
+단계에서는 화면이 정상적으로 뜨고 제출이 되는지만 확인한다).
 
-- [ ] **Step 6: 커밋**
+- [ ] **Step 7: 커밋**
 
 ```bash
-git add components/WelcomeScreen.tsx app/sign-in app/sign-up app/guest .env.local.example 2>/dev/null; git add components/WelcomeScreen.tsx app/sign-in app/sign-up app/guest
-git commit -m "feat: add welcome screen, Clerk auth pages, and guest route"
+git add components/WelcomeScreen.tsx components/CompleteProfileForm.tsx app/sign-in app/sign-up app/guest app/complete-profile
+git commit -m "feat: add welcome screen, Clerk auth pages, guest route, and phone number capture"
 ```
 
 ---
@@ -1580,7 +1677,8 @@ git commit -m "feat: add welcome screen, Clerk auth pages, and guest route"
 - Modify: `app/page.tsx`
 
 **Interfaces:**
-- Consumes: `getViewer`(Task 4), `WelcomeScreen`(Task 9), `InterviewApp`(Task 8)
+- Consumes: `getViewer`(Task 4), `WelcomeScreen`(Task 9), `InterviewApp`(Task 8), Clerk의
+  `currentUser()`(전화번호 등록 여부 확인용)
 
 - [ ] **Step 1: 서버 컴포넌트로 교체**
 
@@ -1588,6 +1686,7 @@ git commit -m "feat: add welcome screen, Clerk auth pages, and guest route"
 
 ```tsx
 import { redirect } from 'next/navigation';
+import { currentUser } from '@clerk/nextjs/server';
 import { getViewer } from '@/lib/server/auth/authorize';
 import { WelcomeScreen } from '@/components/WelcomeScreen';
 import { InterviewApp } from '@/components/InterviewApp';
@@ -1598,6 +1697,16 @@ export default async function Home() {
   if (viewer.role === 'guest') {
     return <WelcomeScreen />;
   }
+
+  // Login uses email, not phone (Clerk's phone identifier is a paid-plan feature — see
+  // Global Constraints). Phone number is collected separately into unsafeMetadata right
+  // after signup, so every signed-in viewer must have it before reaching the app itself.
+  const user = await currentUser();
+  const phoneNumber = user?.unsafeMetadata?.phoneNumber;
+  if (typeof phoneNumber !== 'string' || phoneNumber.trim().length === 0) {
+    redirect('/complete-profile');
+  }
+
   if (viewer.role === 'manager') {
     redirect('/dashboard');
   }
@@ -1611,8 +1720,10 @@ export default async function Home() {
 
 - [ ] **Step 2: 수동 검증**
 
-로그아웃 상태로 `/`에 접속하면 `WelcomeScreen`이 뜨는지, 일반 회원으로 로그인하면 문진 화면이
-바로 뜨는지 확인한다(매니져/admin 라우팅은 Task 12, 15에서 대상 페이지가 생긴 뒤 마저 확인한다).
+로그아웃 상태로 `/`에 접속하면 `WelcomeScreen`이 뜨는지 확인한다. 새로 회원가입한 계정으로
+로그인해서 `/`에 접속하면 `/complete-profile`로 리다이렉트되는지, 거기서 전화번호를 저장하고 나면
+`/`가 이번엔 문진 화면을 바로 보여주는지 확인한다(매니져/admin 라우팅은 Task 12, 15에서 대상
+페이지가 생긴 뒤 마저 확인한다).
 
 - [ ] **Step 3: 커밋**
 
@@ -2295,18 +2406,20 @@ import 'dotenv/config';
 import { clerkClient } from '@clerk/nextjs/server';
 
 async function main() {
-  const phoneNumber = process.argv[2];
-  if (!phoneNumber) {
-    console.error('사용법: npm run seed:admin -- +821012345678');
+  // Login identifier is email, not phone (Clerk's phone identifier is Pro-plan only —
+  // see Global Constraints), so admin lookup is by email too.
+  const email = process.argv[2];
+  if (!email) {
+    console.error('사용법: npm run seed:admin -- admin@example.com');
     process.exit(1);
   }
 
   const client = await clerkClient();
-  const { data: users } = await client.users.getUserList({ phoneNumber: [phoneNumber] });
+  const { data: users } = await client.users.getUserList({ emailAddress: [email] });
   const user = users[0];
 
   if (!user) {
-    console.error(`전화번호 ${phoneNumber}로 가입된 사용자를 찾을 수 없습니다. 먼저 회원가입을 완료하세요.`);
+    console.error(`이메일 ${email}로 가입된 사용자를 찾을 수 없습니다. 먼저 회원가입을 완료하세요.`);
     process.exit(1);
   }
 
@@ -2339,10 +2452,11 @@ npm install -D tsx
 
 - [ ] **Step 3: 수동 검증**
 
-Task 1에서 정한 전화번호로 먼저 `/sign-up`을 통해 실제로 회원가입한 뒤:
+Task 1에서 정한 이메일로 먼저 `/sign-up`을 통해 실제로 회원가입하고 `/complete-profile`에서 전화번호도
+등록한 뒤:
 
 ```bash
-npm run seed:admin -- +821012345678
+npm run seed:admin -- admin@example.com
 ```
 
 그 계정으로 로그인해 `/`가 `/admin`으로 리다이렉트되는지 확인한다.
@@ -2452,10 +2566,11 @@ git commit -m "chore: forbid components/** from importing lib/server directly"
 아래로 교체한다:
 
 ```markdown
-- 회원가입/로그인(Clerk, 전화번호+비밀번호)이 필요하며, 로그인한 회원의 문진 결과는 Neon
-  Postgres(`medical_records` 테이블)에 영구 저장된다. 단, 원본 오디오/이미지 파일은 저장하지 않고
-  AI가 추출한 텍스트만 저장한다. 게스트 로그인은 기존과 동일하게 아무것도 저장하지 않는다. 자세한
-  내용은 `docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md` 참고.
+- 회원가입/로그인(Clerk, 이메일+비밀번호 — 전화번호는 가입 후 별도 화면에서 입력받아 프로필로만
+  저장)이 필요하며, 로그인한 회원의 문진 결과는 Neon Postgres(`medical_records` 테이블)에 영구
+  저장된다. 단, 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다. 게스트
+  로그인은 기존과 동일하게 아무것도 저장하지 않는다. 자세한 내용은
+  `docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md` 참고.
 ```
 
 - [ ] **Step 2: `harness.md`의 "서버 미저장 원칙" 절 갱신**
@@ -2465,12 +2580,14 @@ git commit -m "chore: forbid components/** from importing lib/server directly"
 ```markdown
 ## 회원/저장 아키텍처
 
-로그인(Clerk, 전화번호+비밀번호)한 회원의 문진 결과는 `medical_records` 테이블(Neon Postgres,
+로그인(Clerk, 이메일+비밀번호)한 회원의 문진 결과는 `medical_records` 테이블(Neon Postgres,
 Drizzle)에 영구 저장된다 — 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다.
+전화번호는 Clerk의 로그인 식별자가 아니라(Pro 유료 플랜 전용 기능이라 쓰지 않음), 회원가입 직후
+`/complete-profile` 화면에서 입력받아 `unsafeMetadata.phoneNumber`로 저장하는 프로필 필드다.
 게스트(로그인하지 않은 세션)는 기존과 동일하게 서버에 아무것도 저장하지 않으며, 모든 상태가
 클라이언트 React state에만 존재한다.
 
-역할은 게스트/일반 회원/매니져/관리자 네 가지이며, Clerk가 회원정보(전화번호, 소속단체,
+역할은 게스트/일반 회원/매니져/관리자 네 가지이며, Clerk가 회원정보(이메일, 전화번호, 소속단체,
 매니져여부)의 단일 진실 공급원이다. 매니져는 자신이 속한 단체의 의료정보를 일자별로 조회할 수
 있고, 관리자는 단체 생성과 매니져 임명을 담당한다. 자세한 아키텍처는
 `docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md`와

@@ -22,7 +22,8 @@
 
 ## 1. 목적
 
-1. 회원가입/로그인 없이는 앱의 회원 기능(저장·조회)을 사용할 수 없다. 전화번호 + 비밀번호로 로그인한다.
+1. 회원가입/로그인 없이는 앱의 회원 기능(저장·조회)을 사용할 수 없다. 이메일 + 비밀번호로 로그인하며,
+   전화번호는 로그인 식별자가 아니라 가입 후 별도로 입력받는 프로필 정보다(이유는 §2 참고).
 2. 회원은 소속단체에 속하고, 매니져 여부를 가질 수 있다. 관리자(admin)가 단체를 만들고 회원을 매니져로
    임명한다.
 3. 회원이 문진을 완료하면 그 결과(처방전 추출 텍스트, 녹음 전사문, 문진기록표, 중대성 유무)가
@@ -34,8 +35,13 @@
 
 ## 2. 범위 결정 사항 (브레인스토밍에서 확정)
 
-- **인증 방식**: 전화번호 + 비밀번호. SMS OTP는 이번 범위에 포함하지 않는다(추후 확장 가능하도록
-  Clerk 설정만 열어둔다).
+- **인증 방식**: 이메일 + 비밀번호(Clerk 로그인 식별자). 원래는 전화번호 + 비밀번호로 설계했으나,
+  구현 착수 시점에 Clerk의 전화번호 식별자(SMS 기반 sign-up/sign-in)가 **Pro 유료 플랜 전용**
+  기능임을 확인했다 — 무료(Hobby) 플랜을 유지하기로 하면서 로그인 식별자를 이메일로 바꿨다.
+  전화번호는 회원가입 직후 별도 화면("전화번호 등록")에서 입력받아 Clerk 사용자의
+  `unsafeMetadata.phoneNumber`에 저장한다 — Clerk의 검증된 전화번호 식별자가 아니라 일반 프로필
+  필드이므로 무료 플랜에서도 제약이 없다. `medical_records.phoneNumber`는 매 저장 시 이 값을
+  스냅샷으로 복사해 둔다. SMS OTP는 이번 범위에 포함하지 않는다.
 - **admin/단체 생성**: 배포 시 시드 admin 계정 1개를 만들고, 이후 단체 생성과 매니져 임명은 모두 admin이
   관리 화면에서 수행한다. 일반 회원의 셀프서비스 단체 생성은 없다.
 - **프론트/백엔드 분리 수준**: 단일 Next.js 저장소 내에서 `lib/server/`(백엔드)와 `app/`, `components/`
@@ -53,7 +59,8 @@
 ## 3. 역할 모델
 
 Clerk가 "회원정보(전화번호, 소속단체, 매니져여부)"의 단일 진실 공급원이다 — 별도 회원 테이블을
-두지 않는다.
+두지 않는다. 전화번호는 Clerk의 검증된 식별자가 아니라 `unsafeMetadata.phoneNumber` 프로필 필드로
+저장된다(§2 참고).
 
 | 역할 | 판별 방법 | 권한 |
 |---|---|---|
@@ -62,9 +69,12 @@ Clerk가 "회원정보(전화번호, 소속단체, 매니져여부)"의 단일 �
 | 매니져 | Clerk 세션 + 해당 organization에서 커스텀 역할 `org:manager` | 소속 organizationId의 모든 `medical_records`를 일자별 **읽기 전용** 조회 |
 | 관리자(admin) | Clerk 사용자 `publicMetadata.role === 'admin'` | 단체(Organization) 생성, 회원의 단체 배정, 매니져 역할 임명/해제. 의료정보 열람 권한은 없음 |
 
-- 최초 admin은 로컬 1회성 스크립트(`scripts/seed-admin.ts`)가 Clerk Backend API로 지정된 전화번호
+- 최초 admin은 로컬 1회성 스크립트(`scripts/seed-admin.ts`)가 Clerk Backend API로 지정된 이메일
   사용자에게 `publicMetadata.role = 'admin'`을 설정해 생성한다. 공개 엔드포인트로 노출하지 않는다.
 - 게스트 → 회원 전환 플로우는 이번 스펙 범위 밖이다. 게스트 세션은 매번 완전히 독립적이다.
+- 회원가입 직후 로그인한 사용자가 `unsafeMetadata.phoneNumber`를 아직 입력하지 않았다면, 역할에
+  관계없이 "전화번호 등록" 화면으로 리다이렉트되어 이를 먼저 입력해야 앱의 나머지 기능(문진, 매니져
+  대시보드, 관리자 화면 모두)에 진입할 수 있다.
 - 회원가입 직후에는 어떤 단체에도 속하지 않은 상태다(admin이 아직 배정 전). 이 상태에서도 일반
   회원으로서 문진은 정상 진행되며, 저장되는 `medical_records.organizationId`는 `null`이 된다.
   admin이 나중에 단체를 배정하면 그 시점 이후 생성되는 레코드부터 새 organizationId가 붙는다 —
@@ -92,8 +102,8 @@ Neon Postgres, Drizzle 스키마. 테이블은 `medical_records` 하나만 새�
 
 ## 5. 인증/인가 강제 지점
 
-- `proxy.ts`의 `clerkMiddleware`가 `/dashboard/**`(매니져), `/admin/**`, `/api/records/**`,
-  `/api/admin/**`를 보호한다.
+- `proxy.ts`의 `clerkMiddleware`가 `/dashboard/**`(매니져), `/admin/**`, `/complete-profile/**`,
+  `/api/records/**`, `/api/dashboard/**`, `/api/admin/**`를 보호한다.
 - 매니져 조회 API는 클라이언트가 보낸 organizationId를 신뢰하지 않고, 서버에서 `auth()`로 얻은 실제
   소속단체로만 필터링한다.
 - admin 전용 API는 `publicMetadata.role`을 서버에서 재확인한다(클라이언트 role 클레임 신뢰 금지).
@@ -115,7 +125,8 @@ app/api/
 
 app/(app)/                     ← 프론트엔드
   page.tsx                        기존 7단계 파이프라인 (로직 변경 없음)
-  sign-in/, sign-up/              Clerk 화면 (전화번호+비밀번호, 커스텀 UI로 디자인 시스템 유지)
+  sign-in/, sign-up/              Clerk 화면 (이메일+비밀번호)
+  complete-profile/page.tsx       전화번호 등록(최초 로그인 시 1회, unsafeMetadata에 저장)
   dashboard/page.tsx              매니져 대시보드 (일자별 목록, 중대성/특이사항 필터)
   admin/page.tsx                  관리자 화면 (단체 생성, 매니져 임명)
 
@@ -128,11 +139,15 @@ proxy.ts                  clerkMiddleware + 보호 라우트 매처
 ## 7. 기존 파이프라인과의 통합 지점
 
 통합 지점은 하나뿐이다: `app/page.tsx`의 `finishInterview`(7단계 종합 완료 직후), 게스트가 아니면
-`POST /api/records`를 호출해 `{ prescriptionText, recordingText, interviewRecord, isCritical }`를
-저장한다. 게스트면 이 호출을 스킵한다. 그 외 트리아지/전문의/문진/종합 로직은 변경하지 않는다.
+`POST /api/records`를 호출해 `{ phoneNumber, prescriptionText, recordingText, interviewRecord,
+isCritical }`를 저장한다. `phoneNumber`는 로그인한 Clerk 사용자의 `unsafeMetadata.phoneNumber`에서
+읽는다(§2 참고 — Clerk의 검증된 전화번호 식별자가 아니라 프로필 필드). 게스트면 이 호출을 스킵한다.
+그 외 트리아지/전문의/문진/종합 로직은 변경하지 않는다.
 
-앱 최초 진입 시 로그인/회원가입/게스트 선택 화면을 새로 추가하고, 로그인 성공 시 역할에 따라
-기존 문진 화면(일반 회원) 또는 매니져 대시보드(매니져)로 분기한다. admin은 관리 화면으로 분기한다.
+앱 최초 진입 시 로그인/회원가입/게스트 선택 화면을 새로 추가한다. 로그인에 성공했지만
+`unsafeMetadata.phoneNumber`가 아직 없으면(최초 로그인) 역할과 무관하게 "전화번호 등록" 화면으로
+먼저 보낸다. 전화번호가 있으면 역할에 따라 기존 문진 화면(일반 회원) 또는 매니져 대시보드(매니져)로
+분기한다. admin은 관리 화면으로 분기한다.
 
 ## 8. 보안
 
