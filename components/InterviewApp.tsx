@@ -28,10 +28,6 @@ type QaLogEntry = { question: string; answer: string };
 // follow-up questions (even after dedup) cannot keep the interview loop running forever.
 const MAX_TOTAL_QUESTIONS = 15;
 
-type InterviewAppProps = {
-  mode: 'member' | 'guest';
-};
-
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
     const data = await response.json();
@@ -42,7 +38,7 @@ async function parseErrorMessage(response: Response): Promise<string> {
   return '요청 처리 중 오류가 발생했습니다.';
 }
 
-export function InterviewApp({ mode }: InterviewAppProps) {
+export function InterviewApp() {
   const { user } = useUser();
   const [stage, setStage] = useState<Stage>('upload');
   const [transcript, setTranscript] = useState('');
@@ -232,9 +228,7 @@ export function InterviewApp({ mode }: InterviewAppProps) {
       setReport(data.report);
       setStage('report');
 
-      if (mode === 'member') {
-        await saveRecord(finalOpinions, data.report);
-      }
+      await saveRecord(finalOpinions, data.report);
     } catch (err) {
       if (sessionIdRef.current !== sessionId) return;
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');

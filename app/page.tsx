@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { currentUser } from '@clerk/nextjs/server';
 import { getViewer } from '@/lib/server/auth/authorize';
+import { isProfileComplete } from '@/lib/server/auth/patientProfile';
 import { WelcomeScreen } from '@/components/WelcomeScreen';
 import { InterviewApp } from '@/components/InterviewApp';
 
@@ -12,11 +13,11 @@ export default async function Home() {
   }
 
   // Login uses email, not phone (Clerk's phone identifier is a paid-plan feature — see
-  // Global Constraints). Phone number is collected separately into unsafeMetadata right
-  // after signup, so every signed-in viewer must have it before reaching the app itself.
+  // Global Constraints). Phone number, age band, gender, and occupation are collected
+  // separately into unsafeMetadata right after signup, so every signed-in viewer must have
+  // all four before reaching the app itself.
   const user = await currentUser();
-  const phoneNumber = user?.unsafeMetadata?.phoneNumber;
-  if (typeof phoneNumber !== 'string' || phoneNumber.trim().length === 0) {
+  if (!isProfileComplete(user)) {
     redirect('/complete-profile');
   }
 
@@ -27,5 +28,5 @@ export default async function Home() {
     redirect('/admin');
   }
 
-  return <InterviewApp mode="member" />;
+  return <InterviewApp />;
 }
