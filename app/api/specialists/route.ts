@@ -1,4 +1,5 @@
 import { runSpecialistAnalysis } from '@/lib/agents/specialist';
+import { getPatientProfile } from '@/lib/server/auth/patientProfile';
 
 export const maxDuration = 60;
 
@@ -11,7 +12,10 @@ export async function POST(request: Request) {
     return Response.json({ error: 'transcript와 specialtyIds가 필요합니다.' }, { status: 400 });
   }
 
-  const opinions = await Promise.all(specialtyIds.map((id) => runSpecialistAnalysis(id, transcript)));
+  const profile = await getPatientProfile();
+  const opinions = await Promise.all(
+    specialtyIds.map((id) => runSpecialistAnalysis(id, transcript, profile)),
+  );
 
   return Response.json({ opinions });
 }
