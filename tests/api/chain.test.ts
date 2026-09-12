@@ -17,6 +17,10 @@ vi.mock('ai', async (importOriginal) => {
   return { ...actual, generateObject: mockGenerateObject, transcribe: mockTranscribe };
 });
 
+vi.mock('@/lib/server/auth/patientProfile', () => ({
+  getPatientProfile: vi.fn(async () => null),
+}));
+
 import { POST as transcribePost } from '@/app/api/transcribe/route';
 import { POST as triagePost } from '@/app/api/triage/route';
 import { POST as specialistsPost } from '@/app/api/specialists/route';

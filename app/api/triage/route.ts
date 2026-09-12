@@ -1,6 +1,7 @@
 import { runTriage } from '@/lib/agents/triage';
 import { checkEmergency } from '@/lib/safety/emergencyCheck';
 import { getSpecialtyById } from '@/lib/agents/specialties';
+import { getPatientProfile } from '@/lib/server/auth/patientProfile';
 
 export const maxDuration = 60;
 
@@ -13,7 +14,8 @@ export async function POST(request: Request) {
   }
 
   const emergency = checkEmergency(transcript);
-  const triage = await runTriage(transcript);
+  const profile = await getPatientProfile();
+  const triage = await runTriage(transcript, profile);
   const specialties = triage.specialties.map((s) => ({
     ...s,
     name: getSpecialtyById(s.id)?.name ?? s.id,
