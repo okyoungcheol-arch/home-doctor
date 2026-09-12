@@ -29,6 +29,18 @@ describe('getPatientProfile', () => {
     currentUserMock.mockResolvedValue({ unsafeMetadata: { gender: 'not-a-real-gender' } });
     expect(await getPatientProfile()).toEqual({ ageBand: '', gender: '', occupation: '' });
   });
+
+  it('rejects an ageBand that is not one of the fixed bands', async () => {
+    currentUserMock.mockResolvedValue({ unsafeMetadata: { ageBand: 'not-a-real-band' } });
+    const profile = await getPatientProfile();
+    expect(profile?.ageBand).toBe('');
+  });
+
+  it('rejects an occupation that is not one of the fixed categories', async () => {
+    currentUserMock.mockResolvedValue({ unsafeMetadata: { occupation: 'not-a-real-job' } });
+    const profile = await getPatientProfile();
+    expect(profile?.occupation).toBe('');
+  });
 });
 
 describe('isProfileComplete', () => {
@@ -53,5 +65,18 @@ describe('isProfileComplete', () => {
         },
       }),
     ).toBe(true);
+  });
+
+  it('is false when ageBand or occupation is not one of the fixed catalogs, even if non-empty', () => {
+    expect(
+      isProfileComplete({
+        unsafeMetadata: {
+          phoneNumber: '010-1234-5678',
+          ageBand: 'not-a-real-band',
+          gender: 'male',
+          occupation: '회사원/직장인',
+        },
+      }),
+    ).toBe(false);
   });
 });

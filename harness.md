@@ -121,9 +121,13 @@
 로그인(Clerk, 이메일+비밀번호)한 회원의 문진 결과는 `medical_records` 테이블(Neon Postgres,
 Drizzle)에 영구 저장된다 — 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다.
 전화번호는 Clerk의 로그인 식별자가 아니라(Pro 유료 플랜 전용 기능이라 쓰지 않음), 회원가입 직후
-`/complete-profile` 화면에서 입력받아 `unsafeMetadata.phoneNumber`로 저장하는 프로필 필드다.
-게스트(로그인하지 않은 세션)는 기존과 동일하게 서버에 아무것도 저장하지 않으며, 모든 상태가
-클라이언트 React state에만 존재한다.
+`/complete-profile` 화면에서 전화번호·연령대·성별·직업을 함께 입력받아 `unsafeMetadata`(각각
+`phoneNumber`/`ageBand`/`gender`/`occupation`)에 저장하는 프로필 필드다. 연령대/성별/직업은
+`lib/agents/patientProfile.ts`의 `formatPatientProfileLine`을 통해 트리아지·전문의 1차 분석
+프롬프트에도 전달된다. 무계정 게스트 모드는 없다 — 로그인(손님입장) 또는 회원가입 없이는 앱을 쓸 수
+없으며, `role: 'guest'`(Clerk 세션 없음)는 로그인/회원가입 유도 화면(`WelcomeScreen`)만 보여주는
+용도로만 쓰인다. 자세한 내용은
+`docs/superpowers/specs/2026-09-12-onboarding-profile-design.md` 참고.
 
 역할은 게스트/일반 회원/매니져/관리자 네 가지이며, Clerk가 회원정보(이메일, 전화번호, 소속단체,
 매니져여부)의 단일 진실 공급원이다. 매니져는 자신이 속한 단체의 의료정보를 일자별로 조회할 수

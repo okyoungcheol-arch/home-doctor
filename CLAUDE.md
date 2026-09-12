@@ -19,14 +19,20 @@
 
 - 설계 문서: `docs/superpowers/specs/2026-08-28-medical-interview-app-design.md`
 - 구현 계획: `docs/superpowers/plans/2026-08-28-medical-interview-app-plan.md`
+- 회원/저장: `docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md`,
+  `docs/superpowers/plans/2026-09-11-accounts-medical-records-plan.md`
+- 온보딩/프로필: `docs/superpowers/specs/2026-09-12-onboarding-profile-design.md`,
+  `docs/superpowers/plans/2026-09-12-onboarding-profile-plan.md`
 
 ## 핵심 전역 제약
 
-- 회원가입/로그인(Clerk, 이메일+비밀번호 — 전화번호는 가입 후 별도 화면에서 입력받아 프로필로만
-  저장)이 필요하며, 로그인한 회원의 문진 결과는 Neon Postgres(`medical_records` 테이블)에 영구
-  저장된다. 단, 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다. 게스트
-  로그인은 기존과 동일하게 아무것도 저장하지 않는다. 자세한 내용은
-  `docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md` 참고.
+- 무계정 게스트 모드는 없다 — 회원가입/로그인(Clerk, 이메일+비밀번호) 없이는 앱을 쓸 수 없다.
+  전화번호·연령대·성별·직업은 가입 후 별도 화면에서 입력받아 프로필로 저장하며(로그인 식별자가
+  아님), 연령대/성별/직업은 트리아지·전문의 1차 분석 프롬프트에도 전달된다. 로그인한 회원의 문진
+  결과는 Neon Postgres(`medical_records` 테이블)에 영구 저장된다. 단, 원본 오디오/이미지 파일은
+  저장하지 않고 AI가 추출한 텍스트만 저장한다. 자세한 내용은
+  `docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md`와
+  `docs/superpowers/specs/2026-09-12-onboarding-profile-design.md` 참고.
 - `ai@7`에서는 `generateObject`/`generateText`의 시스템 프롬프트 파라미터가 `system`에서 `instructions`로 이름이 바뀌었다(`system`은 deprecated). 모든 호출에서 `instructions`를 사용한다.
 - UI 문구와 에이전트 프롬프트는 모두 한국어(존댓말)로 작성한다.
 - 생성 모델은 `lib/ai/models.ts`의 `TEXT_MODEL`(품질 우선, `runSynthesis` 전용)과 `FAST_TEXT_MODEL`(속도 우선, 트리아지·전문의 분석/문진 재호출 등 세션당 여러 번 호출되는 구간용)로 구분한다. 새 `generateObject`/`generateText` 호출을 추가할 때 호출 빈도와 품질 민감도를 고려해 이 중 하나를 선택한다.
