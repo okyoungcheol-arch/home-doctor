@@ -1,13 +1,17 @@
 // tests/api/specialists.test.ts
 import { describe, it, expect, vi } from 'vitest';
 
-const runSpecialistAnalysisMock = vi.fn(async (specialtyId: string) => ({
-  specialtyId,
-  specialtyName: specialtyId === 'pulmonology' ? '호흡기내과' : '심장내과',
-  suspectedConditions: [],
-  followUpQuestions: [],
-}));
-const getPatientProfileMock = vi.fn(async () => null);
+const runSpecialistAnalysisMock = vi.fn(
+  async (specialtyId: string, _transcript: string, _profile: unknown) => ({
+    specialtyId,
+    specialtyName: specialtyId === 'pulmonology' ? '호흡기내과' : '심장내과',
+    suspectedConditions: [],
+    followUpQuestions: [],
+  }),
+);
+const getPatientProfileMock = vi.fn(
+  async (): Promise<{ ageBand: string; gender: string; occupation: string } | null> => null,
+);
 
 vi.mock('@/lib/agents/specialist', () => ({
   runSpecialistAnalysis: (specialtyId: string, transcript: string, profile: unknown) =>

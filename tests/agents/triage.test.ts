@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { vi } from 'vitest';
 
 const { mockGenerateObject } = vi.hoisted(() => ({
-  mockGenerateObject: vi.fn(async () => ({
+  mockGenerateObject: vi.fn(async (_options: { prompt: string }) => ({
     object: {
       specialties: [
         { id: 'pulmonology', reason: '기침과 호흡곤란 언급' },

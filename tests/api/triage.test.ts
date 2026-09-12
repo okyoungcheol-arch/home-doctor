@@ -1,8 +1,12 @@
 // tests/api/triage.test.ts
 import { describe, it, expect, vi } from 'vitest';
 
-const runTriageMock = vi.fn(async () => ({ specialties: [{ id: 'pulmonology', reason: '기침 언급' }] }));
-const getPatientProfileMock = vi.fn(async () => null);
+const runTriageMock = vi.fn(async (_transcript: string, _profile: unknown) => ({
+  specialties: [{ id: 'pulmonology', reason: '기침 언급' }],
+}));
+const getPatientProfileMock = vi.fn(
+  async (): Promise<{ ageBand: string; gender: string; occupation: string } | null> => null,
+);
 
 vi.mock('@/lib/agents/triage', () => ({
   runTriage: (transcript: string, profile: unknown) => runTriageMock(transcript, profile),
