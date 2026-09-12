@@ -2,21 +2,25 @@ import { generateObject } from 'ai';
 import { FAST_TEXT_MODEL } from '../ai/models';
 import { getSpecialtyById } from './specialties';
 import { specialistFindingsSchema, type SpecialistOpinion } from '../ai/schemas';
+import { formatPatientProfileLine, type PatientProfile } from './patientProfile';
 
 export async function runSpecialistAnalysis(
   specialtyId: string,
   transcript: string,
+  profile: PatientProfile | null = null,
 ): Promise<SpecialistOpinion> {
   const specialty = getSpecialtyById(specialtyId);
   if (!specialty) {
     throw new Error(`Unknown specialty id: ${specialtyId}`);
   }
 
+  const profileLine = formatPatientProfileLine(profile);
+
   const { object } = await generateObject({
     model: FAST_TEXT_MODEL,
     instructions: specialty.systemPrompt,
     schema: specialistFindingsSchema,
-    prompt: `다음은 환자와의 상담 내용(통화 녹음 전사문 또는 첨부 문서에서 추출한 내용)입니다. 이 내용을 바탕으로 ${specialty.name} 관점에서 1차 소견을 작성하세요.\n\n상담 내용:\n"""\n${transcript}\n"""\n\nfollowUpQuestions의 각 질문에는 반드시 환자가 탭 한 번으로 고를 수 있는 답변 선택지(options)를 2~5개 함께 제시하세요. 질문, 선택지, 이유는 예외 없이 한국어로만 작성하고 영어를 섞지 마세요.`,
+    prompt: `${profileLine}다음은 환자와의 상담 내용(통화 녹음 전사문 또는 첨부 문서에서 추출한 내용)입니다. 이 내용을 바탕으로 ${specialty.name} 관점에서 1차 소견을 작성하세요.\n\n상담 내용:\n"""\n${transcript}\n"""\n\nfollowUpQuestions의 각 질문에는 반드시 환자가 탭 한 번으로 고를 수 있는 답변 선택지(options)를 2~5개 함께 제시하세요. 질문, 선택지, 이유는 예외 없이 한국어로만 작성하고 영어를 섞지 마세요.`,
   });
 
   return { ...object, specialtyId: specialty.id, specialtyName: specialty.name };

@@ -32,6 +32,24 @@ describe('runSpecialistAnalysis', () => {
   it('throws for an unknown specialty id', async () => {
     await expect(runSpecialistAnalysis('not-real', '증상')).rejects.toThrow();
   });
+
+  it('works without a patient profile (backward compatible)', async () => {
+    mockGenerateObject.mockClear();
+    await runSpecialistAnalysis('pulmonology', '기침이 오래갑니다.');
+    const call = mockGenerateObject.mock.calls[0][0] as GenerateObjectCallArgs;
+    expect(call.prompt as string).not.toContain('환자 기본정보');
+  });
+
+  it('includes the patient profile line in the prompt when provided', async () => {
+    mockGenerateObject.mockClear();
+    await runSpecialistAnalysis('pulmonology', '기침이 오래갑니다.', {
+      ageBand: '60~64세',
+      gender: 'male',
+      occupation: '농업',
+    });
+    const call = mockGenerateObject.mock.calls[0][0] as GenerateObjectCallArgs;
+    expect(call.prompt as string).toContain('환자 기본정보: 연령대 60~64세, 성별 남성, 직업 농업');
+  });
 });
 
 describe('runSpecialistFollowUp', () => {
