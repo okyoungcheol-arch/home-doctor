@@ -27,9 +27,9 @@ export function SpecialtySelector({ specialties, onConfirm }: SpecialtySelectorP
   return (
     <div className="flex flex-col gap-4 rounded-12 border border-line-normal bg-background-elevated p-6 shadow-sm">
       <div>
-        <h2 className="text-lg font-semibold">추천 전문분야 확인</h2>
+        <h2 className="text-lg font-semibold">의심되는 증상을 확인해주세요</h2>
         <p className="text-sm text-label-alternative">
-          증상을 분석해 아래 전문분야를 추천드립니다. 문진에 포함하지 않을 분야는 체크를 해제하세요.
+          분석 결과 다음의 증상이 의심되며, 해당 전문분야의 전문의를 추천드립니다. 포함하지 않을 분야는 체크를 해제하세요.
         </p>
       </div>
 
@@ -43,8 +43,8 @@ export function SpecialtySelector({ specialties, onConfirm }: SpecialtySelectorP
               className="mt-1 h-4 w-4"
             />
             <span>
-              <span className="block font-medium">{s.name}</span>
-              <span className="block text-sm text-label-neutral">{s.reason}</span>
+              <span className="block font-medium">{s.reason}</span>
+              <span className="block text-sm text-label-neutral">{s.name}</span>
             </span>
           </label>
         ))}
