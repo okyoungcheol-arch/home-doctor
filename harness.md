@@ -180,12 +180,17 @@
 `memberName`/`memberPhoneNumber`는 저장 시점 `members` 행 값의 스냅샷이다(이후 회원 정보가
 바뀌어도 과거 레코드의 표시값은 바뀌지 않는다). `POST /api/records`(`app/api/records/route.ts`)는
 `requireMember()`로 보호되어 실패 시 401 `저장 권한이 없습니다.`를 반환하고, `activeMemberId`로
-`findMemberById`를 조회해 회원이 이미 삭제됐으면 404를 반환한다(세션의 stale `memberId`를 그대로
-믿지 않음). `memberId`/`organizationId`를 클라이언트가 보내는 값이 아니라 매니저 세션에서 직접
-파생한다 — 손님은 `InterviewApp`의 `canSave` prop이 저장 요청 자체를 막아 이 엔드포인트를 호출하지
-않는다. 저장(성공 시) 또는 "처음으로" 클릭 시 `InterviewApp`이 `POST /api/dashboard/clear-member`를
-호출해 세션의 `activeMemberId`를 지운다 — 그렇지 않으면 공용 태블릿에서 다음 문진이 이전 회원
-명의로 저장되는 사고로 이어진다. 회원 본인 로그인이 없으므로 `GET /api/records`나
+`lib/server/organizations/repository.ts`의 `findMemberInOrganization(id, organizationId)`을
+조회해 회원이 이미 삭제됐거나(세션의 stale `memberId`를 그대로 믿지 않음) 다른 단체 소속이면
+404를 반환한다 — 이 함수는 DB 쿼리 자체를 `id`/`organizationId` 두 조건으로 제한해 "이 회원이
+호출자의 단체에 속하는지" 확인이 필요한 모든 곳(이 라우트, `select-member`, `getPatientProfile()`)이
+하나를 공유한다. `memberId`/`organizationId`를 클라이언트가 보내는 값이 아니라 매니저 세션에서
+직접 파생한다 — 손님은 `InterviewApp`의 `canSave` prop이 저장 요청 자체를 막아 이 엔드포인트를
+호출하지 않는다. 저장이 성공하면 이 라우트 자신이 `clearActiveMember()`를 호출해 세션의
+`activeMemberId`를 지운다(클라이언트가 별도로 기억해 호출할 필요가 없다 — "처음으로" 클릭 시
+저장 없이 회원 선택만 취소하는 경우에는 여전히 `InterviewApp`이 `POST /api/dashboard/clear-member`를
+호출한다). 그렇지 않으면 공용 태블릿에서 다음 문진이 이전 회원 명의로 저장되는 사고로 이어진다.
+회원 본인 로그인이 없으므로 `GET /api/records`나
 `listRecordsForUser` 같은 개인별 히스토리 조회는 없다. 대신 `lib/server/records/repository.ts`의
 `listRecordsForOrganization`이 `medical_records`를 `members`와 조인해 레코드마다 `memberName`을
 함께 반환하고(회원명 오름차순 → 문진일 내림차순 정렬), `components/ManagerDashboard.tsx`의 기록
@@ -195,8 +200,8 @@
 
 `getPatientProfile()`(`lib/server/auth/patientProfile.ts`)도 Clerk `unsafeMetadata`가 아니라
 세션에서 값을 읽는다: 세션이 없으면 `null`, 매니저 세션이지만 `activeMemberId`가 없으면 `null`,
-있으면 `findMemberById`로 회원 행을 조회해 `{ ageBand, gender, occupation }`을 반환한다(이름·
-전화번호는 의도적으로 제외 — AI 프롬프트에 전달되지 않는다). `lib/agents/patientProfile.ts`의
+있으면 `findMemberInOrganization`으로 회원 행을 조회해 `{ ageBand, gender, occupation }`을
+반환한다(이름·전화번호는 의도적으로 제외 — AI 프롬프트에 전달되지 않는다). `lib/agents/patientProfile.ts`의
 `PatientProfile` 타입과 `formatPatientProfileLine`은 값의 출처만 바뀌었을 뿐 그대로다.
 
 자세한 아키텍처는 `docs/superpowers/specs/2026-09-13-manager-member-phone-auth-design.md`(최신,

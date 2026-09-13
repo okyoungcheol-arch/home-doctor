@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireManager } from '@/lib/server/auth/authorize';
 import { createMember, listMembersForOrganization } from '@/lib/server/organizations/repository';
-import { AGE_BANDS, GENDER_OPTIONS, OCCUPATIONS } from '@/lib/profile/constants';
-
-const GENDER_VALUES = GENDER_OPTIONS.map((option) => option.value) as [string, ...string[]];
+import { AGE_BANDS, GENDER_VALUES, OCCUPATIONS } from '@/lib/profile/constants';
+import { guard, parseJsonBody } from '@/lib/server/http';
 
 const createMemberSchema = z.object({
   name: z.string().min(1),
@@ -15,38 +14,26 @@ const createMemberSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  let viewer;
-  try {
-    viewer = await requireManager();
-  } catch {
-    return NextResponse.json({ error: '매니저 권한이 필요합니다.' }, { status: 403 });
-  }
+  const guarded = await guard(requireManager, '매니저 권한이 필요합니다.', 403);
+  if (!guarded.ok) return guarded.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
-  }
+  const parsedBody = await parseJsonBody(request);
+  if (!parsedBody.ok) return parsedBody.response;
 
-  const parsed = createMemberSchema.safeParse(body);
+  const parsed = createMemberSchema.safeParse(parsedBody.data);
   if (!parsed.success) {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
   }
 
-  const member = await createMember({ organizationId: viewer.organizationId!, ...parsed.data });
+  const member = await createMember({ organizationId: guarded.value.organizationId!, ...parsed.data });
 
   return NextResponse.json({ member });
 }
 
 export async function GET() {
-  let viewer;
-  try {
-    viewer = await requireManager();
-  } catch {
-    return NextResponse.json({ error: '매니저 권한이 필요합니다.' }, { status: 403 });
-  }
+  const guarded = await guard(requireManager, '매니저 권한이 필요합니다.', 403);
+  if (!guarded.ok) return guarded.response;
 
-  const members = await listMembersForOrganization(viewer.organizationId!);
+  const members = await listMembersForOrganization(guarded.value.organizationId!);
   return NextResponse.json({ members });
 }

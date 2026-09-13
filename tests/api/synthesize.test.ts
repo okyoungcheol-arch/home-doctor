@@ -26,13 +26,10 @@ vi.mock('@/lib/server/records/repository', () => ({
 }));
 
 import { POST } from '@/app/api/synthesize/route';
+import { jsonRequest as jsonRequestTo } from '@/tests/helpers/request';
 
 function jsonRequest(body: unknown) {
-  return new Request('http://localhost/api/synthesize', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return jsonRequestTo('http://localhost/api/synthesize', body);
 }
 
 const sampleOpinions = [

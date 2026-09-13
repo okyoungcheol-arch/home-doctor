@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { checkRateLimit, getClientIp } from '@/lib/server/rateLimit';
+import { checkRateLimit, getClientIp, MAX_TRACKED_KEYS } from '@/lib/server/rateLimit';
 
 describe('checkRateLimit', () => {
   afterEach(() => {
@@ -30,6 +30,22 @@ describe('checkRateLimit', () => {
     expect(checkRateLimit(keyA, 1, 60_000)).toBe(true);
     expect(checkRateLimit(keyA, 1, 60_000)).toBe(false);
     expect(checkRateLimit(keyB, 1, 60_000)).toBe(true);
+  });
+
+  it('bounds unbounded memory growth by clearing all tracked keys once MAX_TRACKED_KEYS is reached', () => {
+    // An exhausted key stays blocked as long as its own bucket survives...
+    const exhaustedKey = `test-exhaust-${Math.random()}`;
+    expect(checkRateLimit(exhaustedKey, 1, 60_000)).toBe(true);
+    expect(checkRateLimit(exhaustedKey, 1, 60_000)).toBe(false);
+
+    // ...but flooding the map with enough distinct keys (simulating many distinct/spoofed
+    // caller IPs that each call once and never come back) forces a full reset, which is
+    // observable as the exhausted key becoming allowed again despite its window not elapsing.
+    for (let i = 0; i < MAX_TRACKED_KEYS; i++) {
+      checkRateLimit(`test-flood-${i}-${Math.random()}`, 1, 60_000);
+    }
+
+    expect(checkRateLimit(exhaustedKey, 1, 60_000)).toBe(true);
   });
 });
 

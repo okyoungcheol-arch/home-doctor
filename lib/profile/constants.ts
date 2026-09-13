@@ -27,6 +27,10 @@ export const GENDER_OPTIONS: ReadonlyArray<{ value: Gender; label: string }> = [
   { value: 'unspecified', label: '응답 안 함' },
 ];
 
+// GENDER_OPTIONS에서 값만 뽑은 목록 — Zod `z.enum()`(회원 등록 스키마)과 값 검증(profile
+// 조회) 양쪽에서 재사용한다.
+export const GENDER_VALUES = GENDER_OPTIONS.map((option) => option.value) as [Gender, ...Gender[]];
+
 export const OCCUPATIONS = [
   '농업',
   '자영업',

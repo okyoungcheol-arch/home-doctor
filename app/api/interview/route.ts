@@ -1,16 +1,15 @@
-import { runSpecialistFollowUp } from '@/lib/agents/specialist';
+import { runSpecialistFollowUp, type AnsweredQuestion } from '@/lib/agents/specialist';
 import { checkEmergency } from '@/lib/safety/emergencyCheck';
+import { parseJsonBody } from '@/lib/server/http';
+import type { SpecialistOpinion } from '@/lib/ai/schemas';
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
-  }
-  const { specialtyId, transcript, priorOpinion, question, answerText, attachment } = body;
+  const parsedBody = await parseJsonBody(request);
+  if (!parsedBody.ok) return parsedBody.response;
+  const { specialtyId, transcript, priorOpinion, question, answerText, attachment } =
+    parsedBody.data as Record<string, unknown>;
 
   if (
     typeof specialtyId !== 'string' ||
@@ -23,10 +22,10 @@ export async function POST(request: Request) {
   }
 
   const emergency = checkEmergency(answerText);
-  const opinion = await runSpecialistFollowUp(specialtyId, transcript, priorOpinion, {
+  const opinion = await runSpecialistFollowUp(specialtyId, transcript, priorOpinion as SpecialistOpinion, {
     question,
     answerText,
-    attachment,
+    attachment: attachment as AnsweredQuestion['attachment'],
   });
 
   return Response.json({ opinion, emergency });

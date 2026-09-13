@@ -13,13 +13,10 @@ vi.mock('@/lib/server/organizations/repository', () => ({
 }));
 
 import { POST } from '@/app/api/admin/managers/route';
+import { jsonRequest as jsonRequestTo } from '@/tests/helpers/request';
 
 function jsonRequest(body: unknown) {
-  return new Request('http://localhost/api/admin/managers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return jsonRequestTo('http://localhost/api/admin/managers', body);
 }
 
 describe('POST /api/admin/managers', () => {

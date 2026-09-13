@@ -1,6 +1,7 @@
 import { runSpecialistAnalysis } from '@/lib/agents/specialist';
 import { getSpecialtyById } from '@/lib/agents/specialties';
 import { getPatientProfile } from '@/lib/server/auth/patientProfile';
+import { parseJsonBody } from '@/lib/server/http';
 
 export const maxDuration = 60;
 
@@ -10,14 +11,12 @@ export const maxDuration = 60;
 const MAX_SPECIALTY_IDS = 4;
 
 export async function POST(request: Request) {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
-  }
+  const parsedBody = await parseJsonBody(request);
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.data as Record<string, unknown>;
+
   const transcript: string = typeof body.transcript === 'string' ? body.transcript : '';
-  const specialtyIds: string[] = Array.isArray(body.specialtyIds) ? body.specialtyIds : [];
+  const specialtyIds: string[] = Array.isArray(body.specialtyIds) ? (body.specialtyIds as string[]) : [];
 
   if (!transcript.trim() || specialtyIds.length === 0) {
     return Response.json({ error: 'transcript와 specialtyIds가 필요합니다.' }, { status: 400 });

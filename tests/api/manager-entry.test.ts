@@ -20,13 +20,10 @@ vi.mock('@/lib/server/rateLimit', () => ({
 }));
 
 import { POST } from '@/app/api/manager-entry/route';
+import { jsonRequest as jsonRequestTo } from '@/tests/helpers/request';
 
 function jsonRequest(body: unknown) {
-  return new Request('http://localhost/api/manager-entry', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return jsonRequestTo('http://localhost/api/manager-entry', body);
 }
 
 describe('POST /api/manager-entry', () => {

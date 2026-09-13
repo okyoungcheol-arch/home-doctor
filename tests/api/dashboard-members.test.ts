@@ -15,13 +15,10 @@ vi.mock('@/lib/server/organizations/repository', () => ({
 }));
 
 import { POST, GET } from '@/app/api/dashboard/members/route';
+import { jsonRequest as jsonRequestTo } from '@/tests/helpers/request';
 
 function jsonRequest(body: unknown) {
-  return new Request('http://localhost/api/dashboard/members', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return jsonRequestTo('http://localhost/api/dashboard/members', body);
 }
 
 describe('POST /api/dashboard/members', () => {

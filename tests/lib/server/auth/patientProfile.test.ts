@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const readSessionMock = vi.fn();
-const findMemberByIdMock = vi.fn();
+const findMemberInOrganizationMock = vi.fn();
 
 vi.mock('@/lib/server/auth/session', () => ({
   readSession: () => readSessionMock(),
 }));
 
 vi.mock('@/lib/server/organizations/repository', () => ({
-  findMemberById: (id: string) => findMemberByIdMock(id),
+  findMemberInOrganization: (id: string, organizationId: string) =>
+    findMemberInOrganizationMock(id, organizationId),
 }));
 
 import { getPatientProfile } from '@/lib/server/auth/patientProfile';
@@ -16,13 +17,13 @@ import { getPatientProfile } from '@/lib/server/auth/patientProfile';
 describe('getPatientProfile', () => {
   beforeEach(() => {
     readSessionMock.mockReset();
-    findMemberByIdMock.mockReset();
+    findMemberInOrganizationMock.mockReset();
   });
 
   it('returns null for a guest (no session)', async () => {
     readSessionMock.mockResolvedValue(null);
     expect(await getPatientProfile()).toBeNull();
-    expect(findMemberByIdMock).not.toHaveBeenCalled();
+    expect(findMemberInOrganizationMock).not.toHaveBeenCalled();
   });
 
   it('returns null for a manager session with no activeMemberId', async () => {
@@ -32,7 +33,7 @@ describe('getPatientProfile', () => {
       organizationId: 'org_1',
     });
     expect(await getPatientProfile()).toBeNull();
-    expect(findMemberByIdMock).not.toHaveBeenCalled();
+    expect(findMemberInOrganizationMock).not.toHaveBeenCalled();
   });
 
   it('returns null when activeMemberId points to a stale/missing member', async () => {
@@ -42,9 +43,9 @@ describe('getPatientProfile', () => {
       organizationId: 'org_1',
       activeMemberId: 'member_missing',
     });
-    findMemberByIdMock.mockResolvedValue(null);
+    findMemberInOrganizationMock.mockResolvedValue(null);
     expect(await getPatientProfile()).toBeNull();
-    expect(findMemberByIdMock).toHaveBeenCalledWith('member_missing');
+    expect(findMemberInOrganizationMock).toHaveBeenCalledWith('member_missing', 'org_1');
   });
 
   it('returns null when the member row belongs to a different organization than the session', async () => {
@@ -54,17 +55,11 @@ describe('getPatientProfile', () => {
       organizationId: 'org_1',
       activeMemberId: 'member_1',
     });
-    findMemberByIdMock.mockResolvedValue({
-      id: 'member_1',
-      organizationId: 'org_2',
-      name: '홍길동',
-      phoneNumber: '010-1234-5678',
-      ageBand: '60~64세',
-      gender: 'male',
-      occupation: '농업',
-      createdAt: new Date(),
-    });
+    // findMemberInOrganization itself scopes the query to organizationId at the DB level, so a
+    // cross-organization member simply comes back as null — same as a missing member.
+    findMemberInOrganizationMock.mockResolvedValue(null);
     expect(await getPatientProfile()).toBeNull();
+    expect(findMemberInOrganizationMock).toHaveBeenCalledWith('member_1', 'org_1');
   });
 
   it('reads ageBand/gender/occupation from the active member row', async () => {
@@ -74,7 +69,7 @@ describe('getPatientProfile', () => {
       organizationId: 'org_1',
       activeMemberId: 'member_1',
     });
-    findMemberByIdMock.mockResolvedValue({
+    findMemberInOrganizationMock.mockResolvedValue({
       id: 'member_1',
       organizationId: 'org_1',
       name: '홍길동',
@@ -94,7 +89,7 @@ describe('getPatientProfile', () => {
       organizationId: 'org_1',
       activeMemberId: 'member_1',
     });
-    findMemberByIdMock.mockResolvedValue({
+    findMemberInOrganizationMock.mockResolvedValue({
       id: 'member_1',
       organizationId: 'org_1',
       name: '홍길동',

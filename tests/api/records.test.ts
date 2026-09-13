@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const requireMemberMock = vi.fn();
 const createRecordMock = vi.fn();
-const findMemberByIdMock = vi.fn();
+const findMemberInOrganizationMock = vi.fn();
+const clearActiveMemberMock = vi.fn();
 
 vi.mock('@/lib/server/auth/authorize', () => ({
   requireMember: () => requireMemberMock(),
@@ -14,24 +15,27 @@ vi.mock('@/lib/server/records/repository', () => ({
 }));
 
 vi.mock('@/lib/server/organizations/repository', () => ({
-  findMemberById: (id: string) => findMemberByIdMock(id),
+  findMemberInOrganization: (id: string, organizationId: string) =>
+    findMemberInOrganizationMock(id, organizationId),
+}));
+
+vi.mock('@/lib/server/auth/session', () => ({
+  clearActiveMember: () => clearActiveMemberMock(),
 }));
 
 import { POST } from '@/app/api/records/route';
+import { jsonRequest as jsonRequestTo } from '@/tests/helpers/request';
 
 function jsonRequest(body: unknown) {
-  return new Request('http://localhost/api/records', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return jsonRequestTo('http://localhost/api/records', body);
 }
 
 describe('POST /api/records', () => {
   beforeEach(() => {
     requireMemberMock.mockReset();
     createRecordMock.mockReset();
-    findMemberByIdMock.mockReset();
+    findMemberInOrganizationMock.mockReset();
+    clearActiveMemberMock.mockReset();
   });
 
   it('returns 401 when the caller has no active member session', async () => {
@@ -41,9 +45,10 @@ describe('POST /api/records', () => {
     expect(response.status).toBe(401);
     expect(data.error).toBe('저장 권한이 없습니다.');
     expect(createRecordMock).not.toHaveBeenCalled();
+    expect(clearActiveMemberMock).not.toHaveBeenCalled();
   });
 
-  it('creates a record scoped to the server-derived viewer, with member snapshot and diagnosis fields', async () => {
+  it('creates a record scoped to the server-derived viewer, with member snapshot and diagnosis fields, then clears the active member', async () => {
     requireMemberMock.mockResolvedValue({
       role: 'manager',
       userId: null,
@@ -51,7 +56,7 @@ describe('POST /api/records', () => {
       managerId: 'manager_1',
       activeMemberId: 'member_1',
     });
-    findMemberByIdMock.mockResolvedValue({
+    findMemberInOrganizationMock.mockResolvedValue({
       id: 'member_1',
       organizationId: 'org_1',
       name: '홍길동',
@@ -72,7 +77,7 @@ describe('POST /api/records', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(findMemberByIdMock).toHaveBeenCalledWith('member_1');
+    expect(findMemberInOrganizationMock).toHaveBeenCalledWith('member_1', 'org_1');
     expect(createRecordMock).toHaveBeenCalledWith({
       memberId: 'member_1',
       organizationId: 'org_1',
@@ -86,9 +91,10 @@ describe('POST /api/records', () => {
       notableFindings: null,
       isCritical: false,
     });
+    expect(clearActiveMemberMock).toHaveBeenCalledTimes(1);
   });
 
-  it('returns 404 when the active member no longer exists', async () => {
+  it('returns 404 when the active member no longer exists (or belongs to a different organization), without clearing the session', async () => {
     requireMemberMock.mockResolvedValue({
       role: 'manager',
       userId: null,
@@ -96,7 +102,7 @@ describe('POST /api/records', () => {
       managerId: 'manager_1',
       activeMemberId: 'member_1',
     });
-    findMemberByIdMock.mockResolvedValue(null);
+    findMemberInOrganizationMock.mockResolvedValue(null);
 
     const response = await POST(
       jsonRequest({
@@ -114,6 +120,7 @@ describe('POST /api/records', () => {
     expect(response.status).toBe(404);
     expect(data).toEqual({ error: '회원 정보를 찾을 수 없습니다.' });
     expect(createRecordMock).not.toHaveBeenCalled();
+    expect(clearActiveMemberMock).not.toHaveBeenCalled();
   });
 
   it('rejects malformed bodies', async () => {
@@ -127,6 +134,7 @@ describe('POST /api/records', () => {
     const response = await POST(jsonRequest({ documentTexts: 'not-an-array' }));
     expect(response.status).toBe(400);
     expect(createRecordMock).not.toHaveBeenCalled();
+    expect(clearActiveMemberMock).not.toHaveBeenCalled();
   });
 
   it('rejects a body missing diagnosisResult or precautions', async () => {
@@ -147,8 +155,9 @@ describe('POST /api/records', () => {
       }),
     );
     expect(response.status).toBe(400);
-    expect(findMemberByIdMock).not.toHaveBeenCalled();
+    expect(findMemberInOrganizationMock).not.toHaveBeenCalled();
     expect(createRecordMock).not.toHaveBeenCalled();
+    expect(clearActiveMemberMock).not.toHaveBeenCalled();
   });
 
   it('rejects invalid JSON', async () => {
@@ -168,5 +177,6 @@ describe('POST /api/records', () => {
     );
     expect(response.status).toBe(400);
     expect(createRecordMock).not.toHaveBeenCalled();
+    expect(clearActiveMemberMock).not.toHaveBeenCalled();
   });
 });

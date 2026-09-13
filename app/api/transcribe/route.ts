@@ -1,11 +1,8 @@
 import { transcribeAudio } from '@/lib/ai/transcription';
 import { extractDocumentText } from '@/lib/ai/documentExtraction';
+import { isPdf } from '@/lib/ai/fileType';
 
 export const maxDuration = 60;
-
-function isPdf(file: File): boolean {
-  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-}
 
 export async function POST(request: Request) {
   const formData = await request.formData();

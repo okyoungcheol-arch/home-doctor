@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const authMock = vi.fn();
 const findManagerByPhoneNumberMock = vi.fn();
-const findMemberByIdMock = vi.fn();
+const findMemberInOrganizationMock = vi.fn();
 const createRecordMock = vi.fn();
 
 const cookieState = new Map<string, { value: string }>();
@@ -42,7 +42,8 @@ vi.mock('next/headers', () => ({
 
 vi.mock('@/lib/server/organizations/repository', () => ({
   findManagerByPhoneNumber: (phoneNumber: string) => findManagerByPhoneNumberMock(phoneNumber),
-  findMemberById: (id: string) => findMemberByIdMock(id),
+  findMemberInOrganization: (id: string, organizationId: string) =>
+    findMemberInOrganizationMock(id, organizationId),
 }));
 
 vi.mock('@/lib/server/records/repository', () => ({
@@ -53,14 +54,7 @@ import { POST as managerEntryPost } from '@/app/api/manager-entry/route';
 import { POST as selectMemberPost } from '@/app/api/dashboard/select-member/route';
 import { POST as recordsPost } from '@/app/api/records/route';
 import { getViewer } from '@/lib/server/auth/authorize';
-
-function jsonRequest(url: string, body: unknown) {
-  return new Request(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
+import { jsonRequest } from '@/tests/helpers/request';
 
 describe('manager-entry -> select-member -> records save (real session/cookie, DB-mocked)', () => {
   beforeEach(() => {
@@ -69,7 +63,7 @@ describe('manager-entry -> select-member -> records save (real session/cookie, D
     authMock.mockReset();
     authMock.mockResolvedValue({ userId: null }); // no Clerk session anywhere in this flow
     findManagerByPhoneNumberMock.mockReset();
-    findMemberByIdMock.mockReset();
+    findMemberInOrganizationMock.mockReset();
     createRecordMock.mockReset();
   });
 
@@ -98,7 +92,7 @@ describe('manager-entry -> select-member -> records save (real session/cookie, D
     });
 
     // ---- 2) select-member: manager picks a member belonging to their own organization ----
-    findMemberByIdMock.mockResolvedValue({
+    findMemberInOrganizationMock.mockResolvedValue({
       id: 'member_1',
       organizationId: 'org_1',
       name: '홍길동',
@@ -124,7 +118,7 @@ describe('manager-entry -> select-member -> records save (real session/cookie, D
     });
 
     // ---- 3) records: requireMember() reads the same real cookie and authorizes the save ----
-    findMemberByIdMock.mockResolvedValue({
+    findMemberInOrganizationMock.mockResolvedValue({
       id: 'member_1',
       organizationId: 'org_1',
       name: '홍길동',
@@ -153,6 +147,17 @@ describe('manager-entry -> select-member -> records save (real session/cookie, D
         diagnosisResult: '천식 의심',
       }),
     );
+
+    // ---- 4) the save route itself cleared activeMemberId from the real cookie — verified by
+    // reading it back through the real getViewer()/readSession() stack, not a mock assertion.
+    // This is exactly the wiring whose absence was the FINAL WHOLE-BRANCH REVIEW's CRITICAL
+    // finding (a stale activeMemberId sticking around for the next patient on a shared tablet).
+    expect(await getViewer()).toEqual({
+      role: 'manager',
+      userId: null,
+      organizationId: 'org_1',
+      managerId: 'manager_1',
+    });
   });
 
   it('refuses the save when no member has been selected in the session', async () => {

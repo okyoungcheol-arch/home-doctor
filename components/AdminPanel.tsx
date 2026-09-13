@@ -58,7 +58,12 @@ export function AdminPanel() {
       if (!response.ok) throw new Error(data.error ?? '단체 생성에 실패했습니다.');
       setOrgResult(`생성됨: ${data.organization.name} (ID: ${data.organization.id})`);
       setOrgName('');
-      await loadOrganizations();
+      // POST가 이미 새 단체 전체를 응답에 담아 주므로, 목록을 다시 fetch하지 않고 로컬 state에
+      // 바로 반영한다(단체 목록이 서버에서 바뀔 다른 경로가 없으므로 재조회와 결과가 동일하다).
+      setOrganizations((current) =>
+        [...current, data.organization].sort((a, b) => a.name.localeCompare(b.name, 'ko')),
+      );
+      setOrganizationId((current) => current || data.organization.id);
     } catch (err) {
       setOrgError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
     }

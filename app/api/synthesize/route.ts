@@ -1,17 +1,19 @@
 import { runSynthesis } from '@/lib/agents/synthesize';
 import { getViewer } from '@/lib/server/auth/authorize';
 import { listRecordsForMember } from '@/lib/server/records/repository';
+import { parseJsonBody } from '@/lib/server/http';
+import type { SpecialistOpinion } from '@/lib/ai/schemas';
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
-  }
-  const opinions = Array.isArray(body.opinions) ? body.opinions : [];
+  const parsedBody = await parseJsonBody(request);
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.data as Record<string, unknown>;
+
+  const opinions: SpecialistOpinion[] = Array.isArray(body.opinions)
+    ? (body.opinions as SpecialistOpinion[])
+    : [];
 
   if (opinions.length === 0) {
     return Response.json({ error: 'opinions가 필요합니다.' }, { status: 400 });

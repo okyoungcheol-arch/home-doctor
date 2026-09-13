@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const requireManagerMock = vi.fn();
-const findMemberByIdMock = vi.fn();
+const findMemberInOrganizationMock = vi.fn();
 const setActiveMemberMock = vi.fn();
 
 vi.mock('@/lib/server/auth/authorize', () => ({
@@ -10,7 +10,8 @@ vi.mock('@/lib/server/auth/authorize', () => ({
 }));
 
 vi.mock('@/lib/server/organizations/repository', () => ({
-  findMemberById: (id: string) => findMemberByIdMock(id),
+  findMemberInOrganization: (id: string, organizationId: string) =>
+    findMemberInOrganizationMock(id, organizationId),
 }));
 
 vi.mock('@/lib/server/auth/session', () => ({
@@ -18,19 +19,16 @@ vi.mock('@/lib/server/auth/session', () => ({
 }));
 
 import { POST } from '@/app/api/dashboard/select-member/route';
+import { jsonRequest as jsonRequestTo } from '@/tests/helpers/request';
 
 function jsonRequest(body: unknown) {
-  return new Request('http://localhost/api/dashboard/select-member', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return jsonRequestTo('http://localhost/api/dashboard/select-member', body);
 }
 
 describe('POST /api/dashboard/select-member', () => {
   beforeEach(() => {
     requireManagerMock.mockReset();
-    findMemberByIdMock.mockReset();
+    findMemberInOrganizationMock.mockReset();
     setActiveMemberMock.mockReset();
   });
 
@@ -38,7 +36,7 @@ describe('POST /api/dashboard/select-member', () => {
     requireManagerMock.mockRejectedValue(new Error('not a manager'));
     const response = await POST(jsonRequest({ memberId: 'member_1' }));
     expect(response.status).toBe(403);
-    expect(findMemberByIdMock).not.toHaveBeenCalled();
+    expect(findMemberInOrganizationMock).not.toHaveBeenCalled();
     expect(setActiveMemberMock).not.toHaveBeenCalled();
   });
 
@@ -49,13 +47,14 @@ describe('POST /api/dashboard/select-member', () => {
       organizationId: 'org_1',
       managerId: 'manager_1',
     });
-    findMemberByIdMock.mockResolvedValue({ id: 'member_1', organizationId: 'org_1', name: '홍길동' });
+    findMemberInOrganizationMock.mockResolvedValue({ id: 'member_1', organizationId: 'org_1', name: '홍길동' });
 
     const response = await POST(jsonRequest({ memberId: 'member_1' }));
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ success: true });
+    expect(findMemberInOrganizationMock).toHaveBeenCalledWith('member_1', 'org_1');
     expect(setActiveMemberMock).toHaveBeenCalledWith('member_1');
   });
 
@@ -66,7 +65,9 @@ describe('POST /api/dashboard/select-member', () => {
       organizationId: 'org_1',
       managerId: 'manager_1',
     });
-    findMemberByIdMock.mockResolvedValue({ id: 'member_1', organizationId: 'org_2', name: '홍길동' });
+    // findMemberInOrganization itself scopes the query to the manager's organizationId, so a
+    // member that actually belongs to a different organization simply comes back as null.
+    findMemberInOrganizationMock.mockResolvedValue(null);
 
     const response = await POST(jsonRequest({ memberId: 'member_1' }));
     const data = await response.json();
@@ -83,7 +84,7 @@ describe('POST /api/dashboard/select-member', () => {
       organizationId: 'org_1',
       managerId: 'manager_1',
     });
-    findMemberByIdMock.mockResolvedValue(null);
+    findMemberInOrganizationMock.mockResolvedValue(null);
 
     const response = await POST(jsonRequest({ memberId: 'missing' }));
     const data = await response.json();
@@ -103,7 +104,7 @@ describe('POST /api/dashboard/select-member', () => {
 
     const response = await POST(jsonRequest({}));
     expect(response.status).toBe(400);
-    expect(findMemberByIdMock).not.toHaveBeenCalled();
+    expect(findMemberInOrganizationMock).not.toHaveBeenCalled();
     expect(setActiveMemberMock).not.toHaveBeenCalled();
   });
 });

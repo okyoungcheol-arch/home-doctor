@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createManagerSession } from '@/lib/server/auth/session';
 import { findManagerByPhoneNumber } from '@/lib/server/organizations/repository';
 import { checkRateLimit, getClientIp } from '@/lib/server/rateLimit';
+import { parseJsonBody } from '@/lib/server/http';
 
 const managerEntrySchema = z.object({
   phoneNumber: z.string().min(1),
@@ -22,14 +23,10 @@ export async function POST(request: Request) {
     );
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
-  }
+  const parsedBody = await parseJsonBody(request);
+  if (!parsedBody.ok) return parsedBody.response;
 
-  const parsed = managerEntrySchema.safeParse(body);
+  const parsed = managerEntrySchema.safeParse(parsedBody.data);
   if (!parsed.success) {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
   }

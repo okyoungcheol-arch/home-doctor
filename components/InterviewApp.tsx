@@ -217,7 +217,8 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
         }),
       });
       if (!response.ok) throw new Error(await parseErrorMessage(response));
-      fetch('/api/dashboard/clear-member', { method: 'POST' }).catch(() => {});
+      // POST /api/records itself clears the session's active member on success — no separate
+      // client-side call needed here (see app/api/records/route.ts).
     } catch (err) {
       console.error('의료정보 저장 실패', err);
       setSaveWarning('문진 결과를 저장하지 못했습니다. 화면에 표시된 결과는 그대로 확인하실 수 있습니다.');
