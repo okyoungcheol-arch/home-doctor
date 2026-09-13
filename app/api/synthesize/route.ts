@@ -5,7 +5,12 @@ import { listRecordsForMember } from '@/lib/server/records/repository';
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
+  }
   const opinions = Array.isArray(body.opinions) ? body.opinions : [];
 
   if (opinions.length === 0) {

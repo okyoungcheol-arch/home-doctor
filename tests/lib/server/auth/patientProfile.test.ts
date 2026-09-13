@@ -47,6 +47,26 @@ describe('getPatientProfile', () => {
     expect(findMemberByIdMock).toHaveBeenCalledWith('member_missing');
   });
 
+  it('returns null when the member row belongs to a different organization than the session', async () => {
+    readSessionMock.mockResolvedValue({
+      role: 'manager',
+      managerId: 'manager_1',
+      organizationId: 'org_1',
+      activeMemberId: 'member_1',
+    });
+    findMemberByIdMock.mockResolvedValue({
+      id: 'member_1',
+      organizationId: 'org_2',
+      name: '홍길동',
+      phoneNumber: '010-1234-5678',
+      ageBand: '60~64세',
+      gender: 'male',
+      occupation: '농업',
+      createdAt: new Date(),
+    });
+    expect(await getPatientProfile()).toBeNull();
+  });
+
   it('reads ageBand/gender/occupation from the active member row', async () => {
     readSessionMock.mockResolvedValue({
       role: 'manager',

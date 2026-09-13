@@ -14,7 +14,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'admin 권한이 필요합니다.' }, { status: 403 });
   }
 
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
+  }
+
   const parsed = createOrganizationSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });

@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   try {
     viewer = await requireManager();
   } catch {
-    return NextResponse.json({ error: '매니져 권한이 필요합니다.' }, { status: 403 });
+    return NextResponse.json({ error: '매니저 권한이 필요합니다.' }, { status: 403 });
   }
 
   let body: unknown;

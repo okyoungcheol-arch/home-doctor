@@ -5,7 +5,10 @@ import { describe, it, expect, vi } from 'vitest';
 // handlers in sequence, feeding each stage's real HTTP response body into the next
 // stage's request body exactly as app/page.tsx does. The goal is to catch shape-mismatch
 // bugs across stage boundaries that per-route tests (which mock away their own lib/ call)
-// cannot see.
+// cannot see. Enters via /api/intake (the active initial-upload endpoint) rather than the
+// deprecated-for-initial-upload /api/transcribe — see tests/api/manager-save-chain.test.ts
+// for the separate manager-entry -> select-member -> records save chain this one doesn't
+// cover (this test exercises the guest path, which never reaches a save).
 
 const { mockGenerateObject, mockTranscribe } = vi.hoisted(() => ({
   mockGenerateObject: vi.fn(),
@@ -28,7 +31,7 @@ vi.mock('@/lib/server/auth/authorize', () => ({
   getViewer: vi.fn(async () => ({ role: 'guest', userId: null, organizationId: null })),
 }));
 
-import { POST as transcribePost } from '@/app/api/transcribe/route';
+import { POST as intakePost } from '@/app/api/intake/route';
 import { POST as triagePost } from '@/app/api/triage/route';
 import { POST as specialistsPost } from '@/app/api/specialists/route';
 import { POST as interviewPost } from '@/app/api/interview/route';
@@ -36,9 +39,9 @@ import { POST as synthesizePost } from '@/app/api/synthesize/route';
 import { mergeQuestions } from '@/lib/interview/mergeQuestions';
 import type { SpecialistOpinion } from '@/lib/ai/schemas';
 
-describe('full transcribe -> triage -> specialists -> interview -> synthesize chain', () => {
+describe('full intake -> triage -> specialists -> interview -> synthesize chain', () => {
   it('composes each real route response directly into the next request without manual reshaping', async () => {
-    // ---- 1) transcribe ----
+    // ---- 1) intake (the active initial-upload endpoint, replacing /api/transcribe) ----
     mockTranscribe.mockResolvedValueOnce({
       text: '기침이 3주 동안 계속되고 가슴이 답답합니다.',
       language: 'ko',
@@ -47,13 +50,14 @@ describe('full transcribe -> triage -> specialists -> interview -> synthesize ch
 
     const audioFormData = new FormData();
     audioFormData.append('audio', new File([new Uint8Array([1, 2, 3])], 'call.webm', { type: 'audio/webm' }));
-    const transcribeResponse = await transcribePost(
-      new Request('http://localhost/api/transcribe', { method: 'POST', body: audioFormData }),
+    const intakeResponse = await intakePost(
+      new Request('http://localhost/api/intake', { method: 'POST', body: audioFormData }),
     );
-    expect(transcribeResponse.status).toBe(200);
-    const transcribeData = await transcribeResponse.json();
-    const transcript: string = transcribeData.text;
-    expect(transcript).toBe('기침이 3주 동안 계속되고 가슴이 답답합니다.');
+    expect(intakeResponse.status).toBe(200);
+    const intakeData = await intakeResponse.json();
+    // No documents were submitted, so combinedTranscript is exactly the recording section.
+    const transcript: string = intakeData.combinedTranscript;
+    expect(transcript).toBe('[음성 녹음]\n기침이 3주 동안 계속되고 가슴이 답답합니다.');
 
     // ---- 2) triage ----
     mockGenerateObject.mockImplementationOnce(async () => ({

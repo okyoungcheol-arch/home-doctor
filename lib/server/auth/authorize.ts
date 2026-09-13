@@ -53,7 +53,7 @@ export async function requireAdmin(): Promise<Viewer> {
 export async function requireManager(): Promise<Viewer> {
   const viewer = await getViewer();
   if (viewer.role !== 'manager' || !viewer.organizationId) {
-    throw new AuthorizationError('매니져 권한이 필요합니다.');
+    throw new AuthorizationError('매니저 권한이 필요합니다.');
   }
   return viewer;
 }

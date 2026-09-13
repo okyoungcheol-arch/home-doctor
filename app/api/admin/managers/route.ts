@@ -10,6 +10,7 @@ const createManagerSchema = z.object({
 });
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
+const POSTGRES_FOREIGN_KEY_VIOLATION = '23503';
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +19,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'admin 권한이 필요합니다.' }, { status: 403 });
   }
 
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
+  }
+
   const parsed = createManagerSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
@@ -30,6 +37,9 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof Error && (err as { code?: string }).code === POSTGRES_UNIQUE_VIOLATION) {
       return NextResponse.json({ error: '이미 등록된 전화번호입니다.' }, { status: 409 });
+    }
+    if (err instanceof Error && (err as { code?: string }).code === POSTGRES_FOREIGN_KEY_VIOLATION) {
+      return NextResponse.json({ error: '존재하지 않는 단체입니다.' }, { status: 400 });
     }
     throw err;
   }
