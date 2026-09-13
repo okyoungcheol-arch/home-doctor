@@ -2,22 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { PROTECTED_ROUTE_PATTERNS } from '@/proxy';
 
 describe('PROTECTED_ROUTE_PATTERNS', () => {
-  it('keeps protecting the existing member/manager/admin routes', () => {
-    expect(PROTECTED_ROUTE_PATTERNS).toEqual(
+  it('protects only admin routes', () => {
+    expect(PROTECTED_ROUTE_PATTERNS).toEqual([
+      '/admin(.*)',
+      '/api/admin(.*)',
+    ]);
+  });
+
+  it('does not protect dashboard, profile, records, or AI interview routes', () => {
+    expect(PROTECTED_ROUTE_PATTERNS).not.toEqual(
       expect.arrayContaining([
         '/dashboard(.*)',
-        '/admin(.*)',
         '/complete-profile(.*)',
         '/api/records(.*)',
         '/api/dashboard(.*)',
-        '/api/admin(.*)',
-      ]),
-    );
-  });
-
-  it('now protects the AI interview API routes that used to allow anonymous guests', () => {
-    expect(PROTECTED_ROUTE_PATTERNS).toEqual(
-      expect.arrayContaining([
         '/api/triage(.*)',
         '/api/specialists(.*)',
         '/api/interview(.*)',
