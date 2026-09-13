@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { UploadPanel } from '@/components/UploadPanel';
 import { InterviewChat, type AnswerAttachment } from '@/components/InterviewChat';
 import { SpecialistCard } from '@/components/SpecialistCard';
@@ -37,6 +38,7 @@ async function parseErrorMessage(response: Response): Promise<string> {
 }
 
 export function InterviewApp({ canSave }: { canSave: boolean }) {
+  const router = useRouter();
   const [stage, setStage] = useState<Stage>('upload');
   const [transcript, setTranscript] = useState('');
   const [documentTexts, setDocumentTexts] = useState<string[]>([]);
@@ -201,17 +203,21 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
   async function saveRecord(finalOpinions: SpecialistOpinion[], finalReport: SynthesisReportType) {
     if (!canSave) return;
     try {
-      await fetch('/api/records', {
+      const response = await fetch('/api/records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           documentTexts,
           recordingText,
           interviewRecord: { qaLog, opinions: finalOpinions, report: finalReport },
+          diagnosisResult: finalReport.overallImpression,
+          precautions: finalReport.recommendedActions.join('; '),
           notableFindings: finalReport.redFlags.length > 0 ? finalReport.redFlags.join('; ') : null,
           isCritical: finalReport.redFlags.length > 0,
         }),
       });
+      if (!response.ok) throw new Error(await parseErrorMessage(response));
+      fetch('/api/dashboard/clear-member', { method: 'POST' }).catch(() => {});
     } catch (err) {
       console.error('의료정보 저장 실패', err);
       setSaveWarning('문진 결과를 저장하지 못했습니다. 화면에 표시된 결과는 그대로 확인하실 수 있습니다.');
@@ -240,7 +246,7 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
     }
   }
 
-  function handleReset() {
+  async function handleReset() {
     sessionIdRef.current += 1; // must run first — invalidates any in-flight handler's next guard check
     setStage('upload');
     setTranscript('');
@@ -255,13 +261,22 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
     setEmergencyFlags([]);
     setError(null);
     setSaveWarning(null);
+
+    if (canSave) {
+      try {
+        await fetch('/api/dashboard/clear-member', { method: 'POST' });
+      } catch (err) {
+        console.error('활성 회원 해제 실패', err);
+      }
+      router.push('/dashboard');
+    }
   }
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">홈 닥터</h1>
-        {stage !== 'upload' && (
+        {(stage !== 'upload' || canSave) && (
           <button
             type="button"
             onClick={handleReset}

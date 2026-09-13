@@ -21,6 +21,13 @@ vi.mock('@/lib/server/auth/patientProfile', () => ({
   getPatientProfile: vi.fn(async () => null),
 }));
 
+// The synthesize route now looks up the caller's viewer/history (manager-only feature);
+// this chain test exercises the guest path, so stub it out rather than pulling in the
+// real Clerk/session/DB modules (which don't work in this test environment).
+vi.mock('@/lib/server/auth/authorize', () => ({
+  getViewer: vi.fn(async () => ({ role: 'guest', userId: null, organizationId: null })),
+}));
+
 import { POST as transcribePost } from '@/app/api/transcribe/route';
 import { POST as triagePost } from '@/app/api/triage/route';
 import { POST as specialistsPost } from '@/app/api/specialists/route';
