@@ -8,15 +8,6 @@ export async function createRecord(input: NewMedicalRecord): Promise<MedicalReco
   return row;
 }
 
-export async function listRecordsForUser(clerkUserId: string): Promise<MedicalRecord[]> {
-  const db = getDb();
-  return db
-    .select()
-    .from(medicalRecords)
-    .where(eq(medicalRecords.clerkUserId, clerkUserId))
-    .orderBy(desc(medicalRecords.recordDate));
-}
-
 export async function listRecordsForOrganization(organizationId: string): Promise<MedicalRecord[]> {
   const db = getDb();
   return db

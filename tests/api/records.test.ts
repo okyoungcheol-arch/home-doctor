@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const requireMemberMock = vi.fn();
 const createRecordMock = vi.fn();
-const listRecordsForUserMock = vi.fn();
 
 vi.mock('@/lib/server/auth/authorize', () => ({
   requireMember: () => requireMemberMock(),
@@ -11,10 +10,9 @@ vi.mock('@/lib/server/auth/authorize', () => ({
 
 vi.mock('@/lib/server/records/repository', () => ({
   createRecord: (input: unknown) => createRecordMock(input),
-  listRecordsForUser: (id: string) => listRecordsForUserMock(id),
 }));
 
-import { POST, GET } from '@/app/api/records/route';
+import { POST } from '@/app/api/records/route';
 
 function jsonRequest(body: unknown) {
   return new Request('http://localhost/api/records', {
@@ -30,42 +28,68 @@ describe('POST /api/records', () => {
     createRecordMock.mockReset();
   });
 
-  it('returns 401 when the caller is a guest', async () => {
-    requireMemberMock.mockRejectedValue(new Error('not signed in'));
+  it('returns 401 when the caller has no active member session', async () => {
+    requireMemberMock.mockRejectedValue(new Error('선택된 회원이 없습니다.'));
     const response = await POST(jsonRequest({}));
+    const data = await response.json();
     expect(response.status).toBe(401);
+    expect(data.error).toBe('저장 권한이 없습니다.');
     expect(createRecordMock).not.toHaveBeenCalled();
   });
 
   it('creates a record scoped to the server-derived viewer', async () => {
-    requireMemberMock.mockResolvedValue({ role: 'member', userId: 'user_1', organizationId: 'org_1' });
+    requireMemberMock.mockResolvedValue({
+      role: 'manager',
+      userId: null,
+      organizationId: 'org_1',
+      managerId: 'manager_1',
+      activeMemberId: 'member_1',
+    });
     createRecordMock.mockResolvedValue({ id: 'rec_1' });
 
     const response = await POST(
       jsonRequest({
-        phoneNumber: '010-1234-5678',
-        prescriptionText: null,
+        documentTexts: ['처방전 텍스트'],
         recordingText: '전사문',
         interviewRecord: { qaLog: [] },
+        notableFindings: null,
         isCritical: false,
       }),
     );
 
     expect(response.status).toBe(200);
-    expect(createRecordMock).toHaveBeenCalledWith(
-      expect.objectContaining({ clerkUserId: 'user_1', organizationId: 'org_1' }),
-    );
+    expect(createRecordMock).toHaveBeenCalledWith({
+      memberId: 'member_1',
+      organizationId: 'org_1',
+      documentTexts: ['처방전 텍스트'],
+      recordingText: '전사문',
+      interviewRecord: { qaLog: [] },
+      notableFindings: null,
+      isCritical: false,
+    });
   });
 
   it('rejects malformed bodies', async () => {
-    requireMemberMock.mockResolvedValue({ role: 'member', userId: 'user_1', organizationId: null });
-    const response = await POST(jsonRequest({ phoneNumber: '010-0000-0000' }));
+    requireMemberMock.mockResolvedValue({
+      role: 'manager',
+      userId: null,
+      organizationId: 'org_1',
+      managerId: 'manager_1',
+      activeMemberId: 'member_1',
+    });
+    const response = await POST(jsonRequest({ documentTexts: 'not-an-array' }));
     expect(response.status).toBe(400);
     expect(createRecordMock).not.toHaveBeenCalled();
   });
 
   it('rejects invalid JSON', async () => {
-    requireMemberMock.mockResolvedValue({ role: 'member', userId: 'user_1', organizationId: 'org_1' });
+    requireMemberMock.mockResolvedValue({
+      role: 'manager',
+      userId: null,
+      organizationId: 'org_1',
+      managerId: 'manager_1',
+      activeMemberId: 'member_1',
+    });
     const response = await POST(
       new Request('http://localhost/api/records', {
         method: 'POST',
@@ -75,27 +99,5 @@ describe('POST /api/records', () => {
     );
     expect(response.status).toBe(400);
     expect(createRecordMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('GET /api/records', () => {
-  beforeEach(() => {
-    requireMemberMock.mockReset();
-    listRecordsForUserMock.mockReset();
-  });
-
-  it('returns 401 for guests', async () => {
-    requireMemberMock.mockRejectedValue(new Error('not signed in'));
-    const response = await GET();
-    expect(response.status).toBe(401);
-  });
-
-  it("returns the caller's own records", async () => {
-    requireMemberMock.mockResolvedValue({ role: 'member', userId: 'user_1', organizationId: null });
-    listRecordsForUserMock.mockResolvedValue([{ id: 'rec_1' }]);
-    const response = await GET();
-    const data = await response.json();
-    expect(data.records).toEqual([{ id: 'rec_1' }]);
-    expect(listRecordsForUserMock).toHaveBeenCalledWith('user_1');
   });
 });

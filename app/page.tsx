@@ -18,5 +18,5 @@ export default async function Home() {
     return <WelcomeScreen />;
   }
 
-  return <InterviewApp />;
+  return <InterviewApp canSave />;
 }

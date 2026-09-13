@@ -10,7 +10,7 @@ export function WelcomeScreen() {
   const [entered, setEntered] = useState(false);
 
   if (entered) {
-    return <InterviewApp />;
+    return <InterviewApp canSave={false} />;
   }
 
   return (

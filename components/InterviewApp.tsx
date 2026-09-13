@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useUser } from '@clerk/nextjs';
 import { UploadPanel } from '@/components/UploadPanel';
 import { InterviewChat, type AnswerAttachment } from '@/components/InterviewChat';
 import { SpecialistCard } from '@/components/SpecialistCard';
@@ -37,8 +36,7 @@ async function parseErrorMessage(response: Response): Promise<string> {
   return '요청 처리 중 오류가 발생했습니다.';
 }
 
-export function InterviewApp() {
-  const { user } = useUser();
+export function InterviewApp({ canSave }: { canSave: boolean }) {
   const [stage, setStage] = useState<Stage>('upload');
   const [transcript, setTranscript] = useState('');
   const [documentTexts, setDocumentTexts] = useState<string[]>([]);
@@ -201,15 +199,16 @@ export function InterviewApp() {
   }
 
   async function saveRecord(finalOpinions: SpecialistOpinion[], finalReport: SynthesisReportType) {
+    if (!canSave) return;
     try {
       await fetch('/api/records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phoneNumber: (user?.unsafeMetadata?.phoneNumber as string | undefined) ?? '',
-          prescriptionText: documentTexts.length > 0 ? documentTexts.join('\n\n') : null,
-          recordingText: recordingText,
+          documentTexts,
+          recordingText,
           interviewRecord: { qaLog, opinions: finalOpinions, report: finalReport },
+          notableFindings: finalReport.redFlags.length > 0 ? finalReport.redFlags.join('; ') : null,
           isCritical: finalReport.redFlags.length > 0,
         }),
       });
