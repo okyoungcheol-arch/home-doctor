@@ -137,8 +137,11 @@ export async function clearActiveMember(): Promise<void> {
   if (!session) {
     throw new Error('활성 매니저 세션이 없습니다.');
   }
-  const { activeMemberId: _activeMemberId, ...rest } = session;
-  const token = await encodeSessionToken(rest);
+  const token = await encodeSessionToken({
+    role: session.role,
+    managerId: session.managerId,
+    organizationId: session.organizationId,
+  });
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
 }
