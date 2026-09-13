@@ -121,6 +121,19 @@ describe('encodeSessionToken / decodeSessionToken (pure JWT helpers)', () => {
     const decoded = await decodeSessionToken(token);
     expect(decoded).toBeNull();
   });
+
+  it('throws (does not return null) when SESSION_SECRET is unset — a config error, not "no session"', async () => {
+    const payload: SessionPayload = {
+      role: 'manager',
+      managerId: 'manager-1',
+      organizationId: 'org-1',
+    };
+    const token = await encodeSessionToken(payload);
+
+    delete process.env.SESSION_SECRET;
+
+    await expect(decodeSessionToken(token)).rejects.toThrow('SESSION_SECRET');
+  });
 });
 
 describe('createManagerSession', () => {
@@ -166,6 +179,19 @@ describe('readSession', () => {
 
     const session = await readSession();
     expect(session).toEqual({ role: 'manager', managerId: 'manager-1', organizationId: 'org-1' });
+  });
+
+  it('propagates the config error (does not swallow it as null) when SESSION_SECRET is unset', async () => {
+    const token = await encodeSessionToken({
+      role: 'manager',
+      managerId: 'manager-1',
+      organizationId: 'org-1',
+    });
+    cookieStore.get.mockReturnValue({ value: token });
+
+    delete process.env.SESSION_SECRET;
+
+    await expect(readSession()).rejects.toThrow('SESSION_SECRET');
   });
 });
 

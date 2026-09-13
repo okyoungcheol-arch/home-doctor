@@ -63,8 +63,11 @@ export async function encodeSessionToken(
  * 어떤 사유로든 검증에 실패하면 예외를 던지지 않고 `null`을 반환한다.
  */
 export async function decodeSessionToken(token: string): Promise<SessionPayload | null> {
+  // getSecretKey()는 try 밖에서 호출한다 — SESSION_SECRET 미설정은 "세션 없음/무효"가
+  // 아니라 배포 설정 오류이므로, 아래 catch에 흡수되어 null로 뭉개지면 안 된다.
+  const secretKey = getSecretKey();
   try {
-    const { payload } = await jwtVerify(token, getSecretKey(), { algorithms: ['HS256'] });
+    const { payload } = await jwtVerify(token, secretKey, { algorithms: ['HS256'] });
     if (!isSessionPayload(payload)) {
       return null;
     }
