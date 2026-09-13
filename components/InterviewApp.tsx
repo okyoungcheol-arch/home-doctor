@@ -21,7 +21,6 @@ type Stage =
   | 'synthesizing'
   | 'report';
 
-type UploadKind = 'audio' | 'document';
 type QaLogEntry = { question: string; answer: string };
 
 // Hard cap on total questions asked in one interview, so a model that keeps re-emitting
@@ -42,7 +41,8 @@ export function InterviewApp() {
   const { user } = useUser();
   const [stage, setStage] = useState<Stage>('upload');
   const [transcript, setTranscript] = useState('');
-  const [uploadKind, setUploadKind] = useState<UploadKind | null>(null);
+  const [documentTexts, setDocumentTexts] = useState<string[]>([]);
+  const [recordingText, setRecordingText] = useState<string | null>(null);
   const [triageSpecialties, setTriageSpecialties] = useState<TriageSpecialty[]>([]);
   const [opinions, setOpinions] = useState<SpecialistOpinion[]>([]);
   const [queue, setQueue] = useState<QueuedQuestion[]>([]);
@@ -57,10 +57,15 @@ export function InterviewApp() {
   // maxDuration = 60s) can tell its own session has been abandoned and skip its setState calls.
   const sessionIdRef = useRef(0);
 
-  async function handleTranscribed(text: string, kind: UploadKind) {
+  async function handleIntakeComplete(result: {
+    documentTexts: string[];
+    recordingText: string | null;
+    combinedTranscript: string;
+  }) {
     setError(null);
-    setTranscript(text);
-    setUploadKind(kind);
+    setTranscript(result.combinedTranscript);
+    setDocumentTexts(result.documentTexts);
+    setRecordingText(result.recordingText);
     setAnsweredQuestions([]);
     setQaLog([]);
     setStage('triaging');
@@ -70,7 +75,7 @@ export function InterviewApp() {
       const triageResponse = await fetch('/api/triage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: text }),
+        body: JSON.stringify({ transcript: result.combinedTranscript }),
       });
       if (!triageResponse.ok) throw new Error(await parseErrorMessage(triageResponse));
       const triageData = await triageResponse.json();
@@ -202,8 +207,8 @@ export function InterviewApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phoneNumber: (user?.unsafeMetadata?.phoneNumber as string | undefined) ?? '',
-          prescriptionText: uploadKind === 'document' ? transcript : null,
-          recordingText: uploadKind === 'audio' ? transcript : null,
+          prescriptionText: documentTexts.length > 0 ? documentTexts.join('\n\n') : null,
+          recordingText: recordingText,
           interviewRecord: { qaLog, opinions: finalOpinions, report: finalReport },
           isCritical: finalReport.redFlags.length > 0,
         }),
@@ -240,7 +245,8 @@ export function InterviewApp() {
     sessionIdRef.current += 1; // must run first — invalidates any in-flight handler's next guard check
     setStage('upload');
     setTranscript('');
-    setUploadKind(null);
+    setDocumentTexts([]);
+    setRecordingText(null);
     setTriageSpecialties([]);
     setOpinions([]);
     setQueue([]);
@@ -272,7 +278,7 @@ export function InterviewApp() {
 
       <EmergencyBanner flags={emergencyFlags} />
 
-      {stage === 'upload' && <UploadPanel onComplete={handleTranscribed} />}
+      {stage === 'upload' && <UploadPanel onComplete={handleIntakeComplete} />}
       {stage === 'triaging' && <LoadingIndicator label="증상을 분석해 관련 전문분야를 찾는 중입니다..." />}
 
       {stage === 'selecting-specialties' && (
