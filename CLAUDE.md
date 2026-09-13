@@ -25,7 +25,8 @@
   `docs/superpowers/plans/2026-09-12-onboarding-profile-plan.md`
 - 매니저/회원 전화번호 인증 재구축: `docs/superpowers/specs/2026-09-13-manager-member-phone-auth-design.md`,
   `docs/superpowers/plans/2026-09-13-manager-member-phone-auth-plan.md`
-- 관리자 전화번호 인증 전환(Clerk 제거): `docs/superpowers/specs/2026-09-14-admin-phone-auth-design.md`
+- 관리자 전화번호 인증 전환(Clerk 제거): `docs/superpowers/specs/2026-09-14-admin-phone-auth-design.md`,
+  `docs/superpowers/plans/2026-09-14-admin-phone-auth-plan.md`
 
 ## 핵심 전역 제약
 
