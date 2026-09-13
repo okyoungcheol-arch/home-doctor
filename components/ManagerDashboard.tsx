@@ -147,7 +147,6 @@ function MemberSelectionList() {
   const [selectError, setSelectError] = useState<string | null>(null);
 
   function refreshMembers() {
-    setStatus('loading');
     fetch('/api/dashboard/members')
       .then((response) => {
         if (!response.ok) throw new Error('조회에 실패했습니다.');

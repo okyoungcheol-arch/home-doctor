@@ -22,20 +22,22 @@ export function AdminPanel() {
   const [managerResult, setManagerResult] = useState<string | null>(null);
   const [managerError, setManagerError] = useState<string | null>(null);
 
-  async function loadOrganizations() {
-    setOrganizationsLoading(true);
-    setOrganizationsError(null);
-    try {
-      const response = await fetch('/api/admin/organizations');
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? '단체 목록을 불러오지 못했습니다.');
-      setOrganizations(data.organizations);
-      setOrganizationId((current) => current || data.organizations[0]?.id || '');
-    } catch (err) {
-      setOrganizationsError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
-    } finally {
-      setOrganizationsLoading(false);
-    }
+  function loadOrganizations() {
+    return fetch('/api/admin/organizations')
+      .then((response) =>
+        response.json().then((data) => {
+          if (!response.ok) throw new Error(data.error ?? '단체 목록을 불러오지 못했습니다.');
+          setOrganizations(data.organizations);
+          setOrganizationId((current) => current || data.organizations[0]?.id || '');
+          setOrganizationsError(null);
+        }),
+      )
+      .catch((err) => {
+        setOrganizationsError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      })
+      .finally(() => {
+        setOrganizationsLoading(false);
+      });
   }
 
   useEffect(() => {
