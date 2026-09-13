@@ -1,33 +1,45 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
+import { readSession } from '@/lib/server/auth/session';
 
-export type ViewerRole = 'guest' | 'admin' | 'manager' | 'member';
+export type ViewerRole = 'guest' | 'admin' | 'manager';
 
 export type Viewer = {
   role: ViewerRole;
   userId: string | null;
   organizationId: string | null;
+  managerId?: string;
+  activeMemberId?: string;
 };
 
 export class AuthorizationError extends Error {}
 
 export async function getViewer(): Promise<Viewer> {
-  const { userId, orgId, orgRole } = await auth();
+  const { userId } = await auth();
 
-  if (!userId) {
-    return { role: 'guest', userId: null, organizationId: null };
+  if (userId) {
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    const isAdmin = (user.publicMetadata as { role?: string } | null | undefined)?.role === 'admin';
+    if (isAdmin) {
+      return { role: 'admin', userId, organizationId: null };
+    }
   }
 
-  const client = await clerkClient();
-  const user = await client.users.getUser(userId);
-  const isAdmin = (user.publicMetadata as { role?: string } | null | undefined)?.role === 'admin';
+  const session = await readSession();
+  if (session) {
+    const viewer: Viewer = {
+      role: 'manager',
+      userId: null,
+      organizationId: session.organizationId,
+      managerId: session.managerId,
+    };
+    if (session.activeMemberId !== undefined) {
+      viewer.activeMemberId = session.activeMemberId;
+    }
+    return viewer;
+  }
 
-  if (isAdmin) {
-    return { role: 'admin', userId, organizationId: orgId ?? null };
-  }
-  if (orgRole === 'org:admin') {
-    return { role: 'manager', userId, organizationId: orgId ?? null };
-  }
-  return { role: 'member', userId, organizationId: orgId ?? null };
+  return { role: 'guest', userId: null, organizationId: null };
 }
 
 export async function requireAdmin(): Promise<Viewer> {
@@ -48,8 +60,8 @@ export async function requireManager(): Promise<Viewer> {
 
 export async function requireMember(): Promise<Viewer> {
   const viewer = await getViewer();
-  if (!viewer.userId) {
-    throw new AuthorizationError('로그인이 필요합니다.');
+  if (viewer.role !== 'manager' || !viewer.activeMemberId) {
+    throw new AuthorizationError('선택된 회원이 없습니다.');
   }
   return viewer;
 }
