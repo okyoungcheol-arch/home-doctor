@@ -45,6 +45,39 @@ describe('POST /api/specialists', () => {
     expect(response.status).toBe(400);
   });
 
+  it('returns 400 when specialtyIds exceeds the catalog-backed max', async () => {
+    runSpecialistAnalysisMock.mockClear();
+    const request = new Request('http://localhost/api/specialists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transcript: '증상 설명',
+        specialtyIds: ['pulmonology', 'cardiology', 'internal-medicine', 'ent', 'neurology'],
+      }),
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('최대');
+    expect(runSpecialistAnalysisMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an unknown specialty id instead of throwing', async () => {
+    runSpecialistAnalysisMock.mockClear();
+    const request = new Request('http://localhost/api/specialists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript: '증상 설명', specialtyIds: ['not-a-real-specialty'] }),
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('not-a-real-specialty');
+    expect(runSpecialistAnalysisMock).not.toHaveBeenCalled();
+  });
+
   it('fetches the patient profile once and forwards it to every specialty call', async () => {
     runSpecialistAnalysisMock.mockClear();
     getPatientProfileMock.mockResolvedValueOnce({ ageBand: '30~34세', gender: 'female', occupation: '학생' });

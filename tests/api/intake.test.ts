@@ -20,6 +20,10 @@ function makeAudio(name = 'recording.webm', type = 'audio/webm') {
   return new File([new Uint8Array([4, 5, 6])], name, { type });
 }
 
+function makeOversizedFile(name: string, type: string, bytes: number) {
+  return new File([new Uint8Array(bytes)], name, { type });
+}
+
 describe('POST /api/intake', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -125,6 +129,32 @@ describe('POST /api/intake', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('지원하지 않는 파일 형식입니다.');
+  });
+
+  it('returns 400 when a document exceeds the 10MB size cap', async () => {
+    const formData = new FormData();
+    formData.append('documents', makeOversizedFile('big.png', 'image/png', 10 * 1024 * 1024 + 1));
+
+    const request = new Request('http://localhost/api/intake', { method: 'POST', body: formData });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('10MB');
+    expect(vi.mocked(extractDocumentText)).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the audio recording exceeds the 25MB size cap', async () => {
+    const formData = new FormData();
+    formData.append('audio', makeOversizedFile('big.webm', 'audio/webm', 25 * 1024 * 1024 + 1));
+
+    const request = new Request('http://localhost/api/intake', { method: 'POST', body: formData });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('25MB');
+    expect(vi.mocked(transcribeAudio)).not.toHaveBeenCalled();
   });
 
   it('returns 502 when extraction throws', async () => {

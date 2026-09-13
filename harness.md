@@ -49,8 +49,10 @@
 - `combinedTranscript`는 이후 파이프라인(트리아지 이하)에 예전의 단일 "전사문" 자리에 그대로
   전달되는 동일한 계약을 따른다 — 트리아지/전문의 프롬프트 계약은 바뀌지 않았다.
 - `app/api/transcribe/route.ts`(단일 파일을 MIME 타입으로 분기해 전사/문서 분석하던 옛 경로)는
-  코드베이스에 그대로 남아 있지만 클라이언트는 더 이상 호출하지 않는다 — `/api/intake`가 그
-  역할을 대체했다.
+  최초 업로드 단계에서는 더 이상 쓰이지 않는다 — `/api/intake`가 그 역할을 대체했다. 다만 완전히
+  죽은 경로는 아니다: `components/InterviewChat.tsx`가 통합 문진 루프(§6) 중 답변을 음성으로
+  녹음할 때마다 이 라우트를 그대로 호출해 전사한다. 즉 `/api/intake`는 초기 업로드만, `/api/transcribe`는
+  문진 중 음성 답변만 처리하는 두 개의 별도 활성 경로다.
 
 ### 2. 트리아지 — 구현됨
 
@@ -116,12 +118,17 @@
 
 ### 7. 종합 — 구현됨
 
-- `lib/agents/synthesize.ts`의 `runSynthesis(opinions: SpecialistOpinion[]): Promise<SynthesisReport>`는
+- `lib/agents/synthesize.ts`의
+  `runSynthesis(opinions: SpecialistOpinion[], pastRecordsSummary?: string | null): Promise<SynthesisReport>`는
   모든 전문의의 최종 소견을 입력받아 `lib/ai/schemas.ts`의 `synthesisReportSchema`(`overallImpression`,
   `topDifferentials`, `recommendedActions`, `redFlags`)를 만족하는 `SynthesisReport`를 반환한다.
-- `app/api/synthesize/route.ts`가 이 함수를 HTTP로 노출하며, `app/page.tsx`의 `finishInterview`가
-  문진 루프 종료(큐 비었음 또는 질문 수 상한 도달) 시 이를 호출해 결과를 `SynthesisReport` 컴포넌트로
-  렌더링한다.
+- `app/api/synthesize/route.ts`가 이 함수를 HTTP로 노출한다. 매니저 세션에 활성 회원이 있으면
+  `listRecordsForMember`로 해당 회원의 과거 기록 최근 3건을 조회해 날짜/진단/특이사항 요약 문자열을
+  만들고, 이를 `pastRecordsSummary`로 `runSynthesis`에 함께 넘긴다(손님, 또는 과거 기록이 없는
+  회원은 `null` — 프롬프트에 과거 비교 섹션 자체가 붙지 않는다). 과거 기록이 있으면 모델에게 이번
+  소견과 비교해 악화된 부분이 있으면 `overallImpression`에 명시하도록 지시한다. `app/page.tsx`의
+  `finishInterview`가 문진 루프 종료(큐 비었음 또는 질문 수 상한 도달) 시 이 라우트를 호출해 결과를
+  `SynthesisReport` 컴포넌트로 렌더링한다.
 
 ## 회원/저장 아키텍처
 
@@ -168,16 +175,23 @@
 연결된다. `documentTexts`(jsonb `string[]`, 업로드 문서별 추출 텍스트 — 기존의 단일
 `prescriptionText`를 대체)와 `recordingText`(nullable, 음성 녹음 전사)가 문서/녹음을 각각
 보존하고, `notableFindings`(nullable)는 종합 소견의 `redFlags`를 요약해 채운다(기존에 있었지만
-한 번도 채워지지 않았던 `historicalComparisonNote`를 대체). `POST /api/records`
-(`app/api/records/route.ts`)는 `requireMember()`로 보호되어 실패 시 401 `저장 권한이 없습니다.`를
-반환하며, `memberId`/`organizationId`를 클라이언트가 보내는 값이 아니라 매니저 세션에서 직접
+한 번도 채워지지 않았던 `historicalComparisonNote`를 대체). `diagnosisResult`/`precautions`는
+종합 소견의 `overallImpression`/`recommendedActions`를 각각 그대로/세미콜론으로 이어붙여 채우고,
+`memberName`/`memberPhoneNumber`는 저장 시점 `members` 행 값의 스냅샷이다(이후 회원 정보가
+바뀌어도 과거 레코드의 표시값은 바뀌지 않는다). `POST /api/records`(`app/api/records/route.ts`)는
+`requireMember()`로 보호되어 실패 시 401 `저장 권한이 없습니다.`를 반환하고, `activeMemberId`로
+`findMemberById`를 조회해 회원이 이미 삭제됐으면 404를 반환한다(세션의 stale `memberId`를 그대로
+믿지 않음). `memberId`/`organizationId`를 클라이언트가 보내는 값이 아니라 매니저 세션에서 직접
 파생한다 — 손님은 `InterviewApp`의 `canSave` prop이 저장 요청 자체를 막아 이 엔드포인트를 호출하지
-않는다. 회원 본인 로그인이 없으므로 `GET /api/records`나 `listRecordsForUser` 같은 개인별 히스토리
-조회는 없다. 대신 `lib/server/records/repository.ts`의 `listRecordsForOrganization`이
-`medical_records`를 `members`와 조인해 레코드마다 `memberName`을 함께 반환하고(회원명 오름차순 →
-문진일 내림차순 정렬), `components/ManagerDashboard.tsx`의 기록 테이블은 (예전의 전화번호 컬럼
-대신) 회원명 컬럼과 (예전의 과거비교 특이사항 컬럼 대신) `notableFindings` 기반 특이사항 컬럼을
-보여준다.
+않는다. 저장(성공 시) 또는 "처음으로" 클릭 시 `InterviewApp`이 `POST /api/dashboard/clear-member`를
+호출해 세션의 `activeMemberId`를 지운다 — 그렇지 않으면 공용 태블릿에서 다음 문진이 이전 회원
+명의로 저장되는 사고로 이어진다. 회원 본인 로그인이 없으므로 `GET /api/records`나
+`listRecordsForUser` 같은 개인별 히스토리 조회는 없다. 대신 `lib/server/records/repository.ts`의
+`listRecordsForOrganization`이 `medical_records`를 `members`와 조인해 레코드마다 `memberName`을
+함께 반환하고(회원명 오름차순 → 문진일 내림차순 정렬), `components/ManagerDashboard.tsx`의 기록
+테이블은 (예전의 전화번호 컬럼 대신) 회원명 컬럼과 (예전의 과거비교 특이사항 컬럼 대신)
+`notableFindings` 기반 특이사항 컬럼을 보여준다. `listRecordsForMember(memberId)`는 §7의 종합
+단계가 과거 기록 비교에 쓰는 별도 조회 함수다.
 
 `getPatientProfile()`(`lib/server/auth/patientProfile.ts`)도 Clerk `unsafeMetadata`가 아니라
 세션에서 값을 읽는다: 세션이 없으면 `null`, 매니저 세션이지만 `activeMemberId`가 없으면 `null`,

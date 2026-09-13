@@ -24,7 +24,7 @@
 ### 1. 환경 변수 설정
 
 `.env.local.example`을 `.env.local`로 복사하고 `AI_GATEWAY_API_KEY`를 채워주세요. (모델 문자열
-기본값은 `AI_TEXT_MODEL=anthropic/claude-sonnet-5`(종합소견 전용, 품질 우선),
+기본값은 `AI_TEXT_MODEL=anthropic/claude-opus-5`(종합소견 전용, 품질 우선),
 `AI_FAST_TEXT_MODEL=anthropic/claude-haiku-4.5`(트리아지·전문의 분석/문진 재호출 등 고빈도 호출용,
 속도 우선), `AI_TRANSCRIPTION_MODEL=openai/gpt-4o-transcribe`이며, 필요하면 같은 파일에서
 덮어쓸 수 있습니다.)

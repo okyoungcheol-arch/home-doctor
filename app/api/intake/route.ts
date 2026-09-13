@@ -3,6 +3,9 @@ import { extractDocumentText } from '@/lib/ai/documentExtraction';
 
 export const maxDuration = 60;
 
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // 10MB — 처방전/소견서 이미지·PDF 1건당
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25MB — 문진 녹음 1건
+
 function isPdf(file: File): boolean {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 }
@@ -15,6 +18,15 @@ export async function POST(request: Request) {
 
   if (documents.length === 0 && !audio) {
     return Response.json({ error: '파일 또는 녹음이 필요합니다.' }, { status: 400 });
+  }
+
+  for (const file of documents) {
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      return Response.json({ error: '파일 크기가 너무 큽니다(문서 최대 10MB).' }, { status: 400 });
+    }
+  }
+  if (audio && audio.size > MAX_AUDIO_BYTES) {
+    return Response.json({ error: '파일 크기가 너무 큽니다(녹음 최대 25MB).' }, { status: 400 });
   }
 
   try {

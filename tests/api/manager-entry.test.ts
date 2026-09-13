@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findManagerByPhoneNumberMock = vi.fn();
 const createManagerSessionMock = vi.fn();
+const checkRateLimitMock = vi.fn();
 
 vi.mock('@/lib/server/organizations/repository', () => ({
   findManagerByPhoneNumber: (phoneNumber: string) => findManagerByPhoneNumberMock(phoneNumber),
@@ -10,6 +11,12 @@ vi.mock('@/lib/server/organizations/repository', () => ({
 vi.mock('@/lib/server/auth/session', () => ({
   createManagerSession: (managerId: string, organizationId: string) =>
     createManagerSessionMock(managerId, organizationId),
+}));
+
+vi.mock('@/lib/server/rateLimit', () => ({
+  checkRateLimit: (key: string, limit: number, windowMs: number) =>
+    checkRateLimitMock(key, limit, windowMs),
+  getClientIp: () => '203.0.113.1',
 }));
 
 import { POST } from '@/app/api/manager-entry/route';
@@ -26,6 +33,20 @@ describe('POST /api/manager-entry', () => {
   beforeEach(() => {
     findManagerByPhoneNumberMock.mockReset();
     createManagerSessionMock.mockReset();
+    checkRateLimitMock.mockReset();
+    checkRateLimitMock.mockReturnValue(true);
+  });
+
+  it('returns 429 and skips lookup when the rate limit is exceeded', async () => {
+    checkRateLimitMock.mockReturnValue(false);
+
+    const response = await POST(jsonRequest({ phoneNumber: '010-1234-5678' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data).toEqual({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' });
+    expect(findManagerByPhoneNumberMock).not.toHaveBeenCalled();
+    expect(checkRateLimitMock).toHaveBeenCalledWith('manager-entry:203.0.113.1', expect.any(Number), expect.any(Number));
   });
 
   it('creates a manager session and succeeds for a registered phone number', async () => {
