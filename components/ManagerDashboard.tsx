@@ -2,12 +2,13 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import type { MedicalRecord, Member } from '@/lib/server/db/schema';
+import type { Member } from '@/lib/server/db/schema';
+import type { MedicalRecordWithMemberName } from '@/lib/server/records/repository';
 import { AGE_BANDS, GENDER_OPTIONS, OCCUPATIONS, type Gender } from '@/lib/profile/constants';
 
 type DisplayRecord = Pick<
-  MedicalRecord,
-  'id' | 'recordDate' | 'phoneNumber' | 'isCritical' | 'historicalComparisonNote'
+  MedicalRecordWithMemberName,
+  'id' | 'recordDate' | 'memberName' | 'isCritical' | 'notableFindings'
 >;
 
 function MemberRegistrationForm({ onRegistered }: { onRegistered: () => void }) {
@@ -257,16 +258,16 @@ function RecordsTable({
             <thead>
               <tr className="border-b border-line-normal">
                 <th className="p-3">일자</th>
-                <th className="p-3">전화번호</th>
+                <th className="p-3">회원명</th>
                 <th className="p-3">중대성 유무</th>
-                <th className="p-3">과거비교 특이사항</th>
+                <th className="p-3">특이사항</th>
               </tr>
             </thead>
             <tbody>
               {records.map((record) => (
                 <tr key={record.id} className="border-b border-line-normal last:border-0">
                   <td className="p-3">{new Date(record.recordDate).toLocaleDateString('ko-KR')}</td>
-                  <td className="p-3">{record.phoneNumber}</td>
+                  <td className="p-3">{record.memberName}</td>
                   <td className="p-3">
                     {record.isCritical ? (
                       <span className="text-status-negative font-medium">있음</span>
@@ -274,7 +275,7 @@ function RecordsTable({
                       '없음'
                     )}
                   </td>
-                  <td className="p-3">{record.historicalComparisonNote ?? '-'}</td>
+                  <td className="p-3">{record.notableFindings ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
