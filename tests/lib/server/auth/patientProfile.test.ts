@@ -1,82 +1,89 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const currentUserMock = vi.fn();
+const readSessionMock = vi.fn();
+const findMemberByIdMock = vi.fn();
 
-vi.mock('@clerk/nextjs/server', () => ({
-  currentUser: () => currentUserMock(),
+vi.mock('@/lib/server/auth/session', () => ({
+  readSession: () => readSessionMock(),
 }));
 
-import { getPatientProfile, isProfileComplete } from '@/lib/server/auth/patientProfile';
+vi.mock('@/lib/server/organizations/repository', () => ({
+  findMemberById: (id: string) => findMemberByIdMock(id),
+}));
+
+import { getPatientProfile } from '@/lib/server/auth/patientProfile';
 
 describe('getPatientProfile', () => {
   beforeEach(() => {
-    currentUserMock.mockReset();
+    readSessionMock.mockReset();
+    findMemberByIdMock.mockReset();
   });
 
-  it('returns null when there is no signed-in user', async () => {
-    currentUserMock.mockResolvedValue(null);
+  it('returns null for a guest (no session)', async () => {
+    readSessionMock.mockResolvedValue(null);
     expect(await getPatientProfile()).toBeNull();
+    expect(findMemberByIdMock).not.toHaveBeenCalled();
   });
 
-  it('reads ageBand/gender/occupation from unsafeMetadata', async () => {
-    currentUserMock.mockResolvedValue({
-      unsafeMetadata: { ageBand: '60~64세', gender: 'male', occupation: '농업' },
+  it('returns null for a manager session with no activeMemberId', async () => {
+    readSessionMock.mockResolvedValue({
+      role: 'manager',
+      managerId: 'manager_1',
+      organizationId: 'org_1',
+    });
+    expect(await getPatientProfile()).toBeNull();
+    expect(findMemberByIdMock).not.toHaveBeenCalled();
+  });
+
+  it('returns null when activeMemberId points to a stale/missing member', async () => {
+    readSessionMock.mockResolvedValue({
+      role: 'manager',
+      managerId: 'manager_1',
+      organizationId: 'org_1',
+      activeMemberId: 'member_missing',
+    });
+    findMemberByIdMock.mockResolvedValue(null);
+    expect(await getPatientProfile()).toBeNull();
+    expect(findMemberByIdMock).toHaveBeenCalledWith('member_missing');
+  });
+
+  it('reads ageBand/gender/occupation from the active member row', async () => {
+    readSessionMock.mockResolvedValue({
+      role: 'manager',
+      managerId: 'manager_1',
+      organizationId: 'org_1',
+      activeMemberId: 'member_1',
+    });
+    findMemberByIdMock.mockResolvedValue({
+      id: 'member_1',
+      organizationId: 'org_1',
+      name: '홍길동',
+      phoneNumber: '010-1234-5678',
+      ageBand: '60~64세',
+      gender: 'male',
+      occupation: '농업',
+      createdAt: new Date(),
     });
     expect(await getPatientProfile()).toEqual({ ageBand: '60~64세', gender: 'male', occupation: '농업' });
   });
 
-  it('falls back to empty values when a field is missing or an invalid gender', async () => {
-    currentUserMock.mockResolvedValue({ unsafeMetadata: { gender: 'not-a-real-gender' } });
+  it('defensively blanks out a corrupted/invalid enum value on the member row', async () => {
+    readSessionMock.mockResolvedValue({
+      role: 'manager',
+      managerId: 'manager_1',
+      organizationId: 'org_1',
+      activeMemberId: 'member_1',
+    });
+    findMemberByIdMock.mockResolvedValue({
+      id: 'member_1',
+      organizationId: 'org_1',
+      name: '홍길동',
+      phoneNumber: '010-1234-5678',
+      ageBand: 'not-a-real-band',
+      gender: 'not-a-real-gender',
+      occupation: 'not-a-real-job',
+      createdAt: new Date(),
+    });
     expect(await getPatientProfile()).toEqual({ ageBand: '', gender: '', occupation: '' });
-  });
-
-  it('rejects an ageBand that is not one of the fixed bands', async () => {
-    currentUserMock.mockResolvedValue({ unsafeMetadata: { ageBand: 'not-a-real-band' } });
-    const profile = await getPatientProfile();
-    expect(profile?.ageBand).toBe('');
-  });
-
-  it('rejects an occupation that is not one of the fixed categories', async () => {
-    currentUserMock.mockResolvedValue({ unsafeMetadata: { occupation: 'not-a-real-job' } });
-    const profile = await getPatientProfile();
-    expect(profile?.occupation).toBe('');
-  });
-});
-
-describe('isProfileComplete', () => {
-  it('is false for a null user', () => {
-    expect(isProfileComplete(null)).toBe(false);
-  });
-
-  it('is false when any required field is missing', () => {
-    expect(
-      isProfileComplete({ unsafeMetadata: { phoneNumber: '010-1234-5678', ageBand: '30~34세', gender: 'male' } }),
-    ).toBe(false);
-  });
-
-  it('is true when phoneNumber/ageBand/occupation are non-empty and gender is a valid choice', () => {
-    expect(
-      isProfileComplete({
-        unsafeMetadata: {
-          phoneNumber: '010-1234-5678',
-          ageBand: '30~34세',
-          gender: 'unspecified',
-          occupation: '회사원/직장인',
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it('is false when ageBand or occupation is not one of the fixed catalogs, even if non-empty', () => {
-    expect(
-      isProfileComplete({
-        unsafeMetadata: {
-          phoneNumber: '010-1234-5678',
-          ageBand: 'not-a-real-band',
-          gender: 'male',
-          occupation: '회사원/직장인',
-        },
-      }),
-    ).toBe(false);
   });
 });
