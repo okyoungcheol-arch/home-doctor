@@ -19,10 +19,13 @@ export async function listRecordsForOrganization(
       id: medicalRecords.id,
       memberId: medicalRecords.memberId,
       organizationId: medicalRecords.organizationId,
+      memberPhoneNumber: medicalRecords.memberPhoneNumber,
       recordDate: medicalRecords.recordDate,
       documentTexts: medicalRecords.documentTexts,
       recordingText: medicalRecords.recordingText,
       interviewRecord: medicalRecords.interviewRecord,
+      diagnosisResult: medicalRecords.diagnosisResult,
+      precautions: medicalRecords.precautions,
       notableFindings: medicalRecords.notableFindings,
       isCritical: medicalRecords.isCritical,
       createdAt: medicalRecords.createdAt,
@@ -32,4 +35,13 @@ export async function listRecordsForOrganization(
     .innerJoin(members, eq(medicalRecords.memberId, members.id))
     .where(eq(medicalRecords.organizationId, organizationId))
     .orderBy(asc(members.name), desc(medicalRecords.recordDate));
+}
+
+export async function listRecordsForMember(memberId: string): Promise<MedicalRecord[]> {
+  const db = getDb();
+  return db
+    .select()
+    .from(medicalRecords)
+    .where(eq(medicalRecords.memberId, memberId))
+    .orderBy(desc(medicalRecords.recordDate));
 }

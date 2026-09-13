@@ -29,10 +29,14 @@ export const medicalRecords = pgTable('medical_records', {
   id: uuid('id').primaryKey().defaultRandom(),
   memberId: uuid('member_id').notNull().references(() => members.id),
   organizationId: uuid('organization_id').notNull().references(() => organizations.id),
+  memberName: text('member_name').notNull(), // 방문 시점 회원 이름 스냅샷 (members.name과 별개, 이후 변경돼도 보존)
+  memberPhoneNumber: text('member_phone_number').notNull(), // 방문 시점 회원 전화번호 스냅샷 (members.phoneNumber와 별개)
   recordDate: timestamp('record_date', { withTimezone: true }).notNull().defaultNow(),
   documentTexts: jsonb('document_texts').$type<string[]>().notNull().default([]), // 문서 업로드(최대 2개) 추출 텍스트
   recordingText: text('recording_text'),
   interviewRecord: jsonb('interview_record').$type<Record<string, unknown>>().notNull(),
+  diagnosisResult: text('diagnosis_result').notNull(), // 종합 소견 overallImpression 기반 진단 요약
+  precautions: text('precautions').notNull(), // 종합 소견 recommendedActions를 합친 주의사항 텍스트
   notableFindings: text('notable_findings'), // 종합 소견 redFlags/overallImpression 요약 ("특이사항")
   isCritical: boolean('is_critical').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
