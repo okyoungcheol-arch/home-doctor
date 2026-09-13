@@ -23,15 +23,30 @@
   `docs/superpowers/plans/2026-09-11-accounts-medical-records-plan.md`
 - 온보딩/프로필: `docs/superpowers/specs/2026-09-12-onboarding-profile-design.md`,
   `docs/superpowers/plans/2026-09-12-onboarding-profile-plan.md`
+- 매니저/회원 전화번호 인증 재구축: `docs/superpowers/specs/2026-09-13-manager-member-phone-auth-design.md`,
+  `docs/superpowers/plans/2026-09-13-manager-member-phone-auth-plan.md`
 
 ## 핵심 전역 제약
 
-- 무계정 게스트 모드는 없다 — 회원가입/로그인(Clerk, 이메일+비밀번호) 없이는 앱을 쓸 수 없다.
-  전화번호·연령대·성별·직업은 가입 후 별도 화면에서 입력받아 프로필로 저장하며(로그인 식별자가
-  아님), 연령대/성별/직업은 트리아지·전문의 1차 분석 프롬프트에도 전달된다. 로그인한 회원의 문진
-  결과는 Neon Postgres(`medical_records` 테이블)에 영구 저장된다. 단, 원본 오디오/이미지 파일은
-  저장하지 않고 AI가 추출한 텍스트만 저장한다. 자세한 내용은
-  `docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md`와
+- 인증/권한은 관리자(admin)·매니저(manager)·손님(guest) 3계층이며, 회원(member)은 로그인하지
+  않는다. 관리자는 지금도 Clerk 이메일+비밀번호 로그인(`publicMetadata.role === 'admin'`)이다.
+  매니저는 Clerk 계정이 없고 관리자가 등록해둔 전화번호를 입력하는 것만으로 입장한다
+  (`app/manager-entry/page.tsx` → `POST /api/manager-entry` → `managers` 테이블 조회 성공 시
+  `lib/server/auth/session.ts`의 `createManagerSession`이 서명된 HttpOnly 쿠키(`hd_session`, `jose`
+  JWT, 30일 만료)를 발급 — 비밀번호/PIN/OTP 없음, 개인/학습용 프로토타입 전제의 낮은 보안 수준으로
+  의도된 것). 회원은 매니저가 이름·전화번호·성별·연령대·직업을 모두 입력해 등록해두는 대상이며
+  (`members` 테이블), 매니저가 `/dashboard`에서 회원을 선택하면 세션에 `activeMemberId`가 추가되어
+  그 회원 명의로 문진이 진행된다 — 연령대/성별/직업은 트리아지·전문의 1차 분석 프롬프트에도
+  전달된다(이름·전화번호는 전달하지 않음). 손님은 세션 없이 즉시 문진을 시작할 수 있지만 결과는
+  저장되지 않는다. 매니저가 활성 회원을 선택한 상태에서 진행한 문진 결과만 Neon
+  Postgres(`organizations`/`managers`/`members`/`medical_records` 테이블, Drizzle)에 영구
+  저장되며, `medical_records`는 `memberId`/`organizationId` FK로 회원·조직에 연결되고
+  `documentTexts`(업로드 문서별 추출 텍스트 배열, 최대 2개)·`recordingText`(음성 녹음 전사,
+  nullable)·`interviewRecord`·`notableFindings`(종합 소견의 red flag를 요약한 특이사항, nullable)
+  등을 담는다. 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다. 자세한 내용은
+  `docs/superpowers/specs/2026-09-13-manager-member-phone-auth-design.md`(최신, 이 모델의 전체
+  근거) 및 배경 문서인
+  `docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md`,
   `docs/superpowers/specs/2026-09-12-onboarding-profile-design.md` 참고.
 - `ai@7`에서는 `generateObject`/`generateText`의 시스템 프롬프트 파라미터가 `system`에서 `instructions`로 이름이 바뀌었다(`system`은 deprecated). 모든 호출에서 `instructions`를 사용한다.
 - UI 문구와 에이전트 프롬프트는 모두 한국어(존댓말)로 작성한다.

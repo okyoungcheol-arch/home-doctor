@@ -32,18 +32,25 @@
 
 ### 1. 전사/문서 분석 (Transcription / Document Extraction) — 구현됨
 
-- `app/api/transcribe/route.ts`가 업로드된 파일의 MIME 타입으로 분기한다: `audio/*`는 전사, 이미지 또는
-  PDF는 문서 분석 경로로 보낸다.
-- 오디오: `lib/ai/transcription.ts`의 `transcribeAudio(audio: Uint8Array | Buffer): Promise<TranscriptionOutput>`.
-  내부적으로 Vercel AI SDK의 `transcribe()`를 `lib/ai/models.ts`의 `TRANSCRIPTION_MODEL`로 호출한다.
-  `TranscriptionOutput`은 `{ text, language?, durationInSeconds? }` 형태.
-- 이미지/PDF(처방전, 진단서 등): `lib/ai/documentExtraction.ts`의
-  `extractDocumentText(file: { data, mediaType, filename? }): Promise<DocumentExtractionOutput>`.
-  `generateText`를 `FAST_TEXT_MODEL`로 멀티모달(`{ type: 'file' }` 콘텐츠 파트) 호출해 문서에 적힌
-  증상·진단명·처방 약물 등을 한국어 텍스트로 정리한다. 반환 타입은 `{ text }`.
-- 두 경로 모두 결과의 `text`가 이후 파이프라인(트리아지 이하)에 "전사문" 자리에 그대로 전달되는 동일한
-  계약을 따른다 — 트리아지/전문의 프롬프트는 이 텍스트를 "환자 상담 내용"으로 지칭해 오디오/문서 중
-  어느 쪽에서 왔는지 구분하지 않는다.
+- `components/UploadPanel.tsx`가 문서(이미지/PDF) 최대 2개와 음성 녹음 1개를 클라이언트에서
+  스테이징한다 — 예전처럼 파일을 고르는 즉시 업로드하는 것이 아니라, 사용자가 원하는 만큼(문서 0~2개
+  +/- 녹음 0~1개, 최소 1개는 있어야 함) 담아둔 뒤 "분석 시작" 버튼을 눌러야 한 번에 제출된다.
+- `app/api/intake/route.ts`(신규, 현재 클라이언트가 실제로 호출하는 활성 경로)가 이 다중 입력을
+  받아 각 문서를 `lib/ai/documentExtraction.ts`의 `extractDocumentText`로, 녹음이 있으면
+  `lib/ai/transcription.ts`의 `transcribeAudio`로 각각 텍스트화한 뒤, `[문서 1]`/`[문서 2]`/
+  `[음성 녹음]` 레이블을 붙인 섹션을 빈 줄로 이어붙여 하나의 `combinedTranscript` 문자열로 합친다.
+  응답 형태는 `{ documentTexts: string[], recordingText: string | null, combinedTranscript: string }`.
+- 오디오 전사(`transcribeAudio(audio: Uint8Array | Buffer): Promise<TranscriptionOutput>`)와 문서
+  추출(`extractDocumentText(file: { data, mediaType, filename? }): Promise<DocumentExtractionOutput>`)
+  함수 자체의 계약은 이전과 동일하다 — 전자는 Vercel AI SDK의 `transcribe()`를
+  `lib/ai/models.ts`의 `TRANSCRIPTION_MODEL`로, 후자는 `generateText`를 `FAST_TEXT_MODEL`로
+  멀티모달(`{ type: 'file' }` 콘텐츠 파트) 호출해 문서에 적힌 증상·진단명·처방 약물 등을 한국어
+  텍스트로 정리한다.
+- `combinedTranscript`는 이후 파이프라인(트리아지 이하)에 예전의 단일 "전사문" 자리에 그대로
+  전달되는 동일한 계약을 따른다 — 트리아지/전문의 프롬프트 계약은 바뀌지 않았다.
+- `app/api/transcribe/route.ts`(단일 파일을 MIME 타입으로 분기해 전사/문서 분석하던 옛 경로)는
+  코드베이스에 그대로 남아 있지만 클라이언트는 더 이상 호출하지 않는다 — `/api/intake`가 그
+  역할을 대체했다.
 
 ### 2. 트리아지 — 구현됨
 
@@ -118,22 +125,72 @@
 
 ## 회원/저장 아키텍처
 
-로그인(Clerk, 이메일+비밀번호)한 회원의 문진 결과는 `medical_records` 테이블(Neon Postgres,
-Drizzle)에 영구 저장된다 — 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다.
-전화번호는 Clerk의 로그인 식별자가 아니라(Pro 유료 플랜 전용 기능이라 쓰지 않음), 회원가입 직후
-`/complete-profile` 화면에서 전화번호·연령대·성별·직업을 함께 입력받아 `unsafeMetadata`(각각
-`phoneNumber`/`ageBand`/`gender`/`occupation`)에 저장하는 프로필 필드다. 연령대/성별/직업은
-`lib/agents/patientProfile.ts`의 `formatPatientProfileLine`을 통해 트리아지·전문의 1차 분석
-프롬프트에도 전달된다. 무계정 게스트 모드는 없다 — 로그인(손님입장) 또는 회원가입 없이는 앱을 쓸 수
-없으며, `role: 'guest'`(Clerk 세션 없음)는 로그인/회원가입 유도 화면(`WelcomeScreen`)만 보여주는
-용도로만 쓰인다. 자세한 내용은
-`docs/superpowers/specs/2026-09-12-onboarding-profile-design.md` 참고.
+역할은 관리자(admin)/매니저(manager)/손님(guest) 3계층이며, 회원(member)은 로그인하지 않는
+대상이다. `lib/server/auth/authorize.ts`의 `getViewer()`가 Clerk admin 확인 → `readSession()`
+(매니저 쿠키) → 없으면 `guest` 순으로 판정한다. `ViewerRole`에는 더 이상 독립된 `'member'` 값이
+없다 — `Viewer = { role, userId, organizationId, managerId?, activeMemberId? }`.
 
-역할은 게스트/일반 회원/매니져/관리자 네 가지이며, Clerk가 회원정보(이메일, 전화번호, 소속단체,
-매니져여부)의 단일 진실 공급원이다. 매니져는 자신이 속한 단체의 의료정보를 일자별로 조회할 수
-있고, 관리자는 단체 생성과 매니져 임명을 담당한다. 자세한 아키텍처는
-`docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md`와
-`docs/superpowers/plans/2026-09-11-accounts-medical-records-plan.md` 참고.
+- **관리자(admin)**: 기존과 동일하게 Clerk 이메일+비밀번호 로그인, `publicMetadata.role === 'admin'`,
+  `requireAdmin()`으로 보호.
+- **매니저(manager)**: Clerk 계정이 없다. `lib/server/db/schema.ts`의 `managers` 테이블
+  (`id`/`organizationId` FK/`phoneNumber` unique/`position`/`createdAt`)에 관리자가 등록해둔
+  전화번호를 `app/manager-entry/page.tsx`의 입력 폼에 제출하면 `POST /api/manager-entry`가
+  `findManagerByPhoneNumber`(`lib/server/organizations/repository.ts`)로 조회하고, 일치하면
+  `lib/server/auth/session.ts`의 `createManagerSession(managerId, organizationId)`이 서명된
+  HttpOnly 쿠키(`hd_session`, `jose` HS256 JWT, 비밀키는 `SESSION_SECRET`, 만료 30일 — 시설
+  비치 태블릿/키오스크에 로그인 상태를 유지하는 용도라 방문 세션이 아닌 긴 만료를 쓴다)를 발급한다.
+  비밀번호/PIN/OTP는 없다 — 전화번호 자체가 자격 증명이며, 개인/학습용 프로토타입 전제의 명시적
+  저보안 트레이드오프다.
+- **회원(member)**: 로그인 자체가 없다. `members` 테이블(`id`/`organizationId` FK/`name`/
+  `phoneNumber`/`gender`/`ageBand`/`occupation`/`createdAt`, 전 필드 필수)에 매니저가
+  `/dashboard`(`POST /api/dashboard/members`)에서 등록한다. 매니저가 `GET /api/dashboard/members`
+  목록에서 회원을 선택하면 `POST /api/dashboard/select-member`가 `setActiveMember(memberId)`로
+  세션 쿠키에 `activeMemberId`를 추가하고, 그 회원 명의로 문진이 진행된다.
+- **손님(guest)**: 세션이 전혀 없다. `components/WelcomeScreen.tsx`(클라이언트 컴포넌트)가 로컬
+  `entered` state만으로 "손님입장" 클릭 시 `<InterviewApp canSave={false} />`를 그 자리에서
+  렌더한다 — 실제 네비게이션 없이 인라인 전환이다(게스트의 `getViewer()`는 항상 `guest`를
+  반환하므로 `/`로 다시 이동시키면 무한 루프가 되기 때문에 의도적으로 네비게이션을 쓰지 않는다).
+  "매니저 전화번호 입장" 링크는 `/manager-entry`로 연결된다.
+- `proxy.ts` 미들웨어는 이제 `/admin(.*)`, `/api/admin(.*)`만 Clerk로 보호한다. 대시보드, 기록
+  저장, AI 문진 파이프라인(`/api/triage`, `/api/specialists`, `/api/interview`, `/api/synthesize`,
+  `/api/intake`)을 포함한 나머지 모든 라우트는 각 라우트 핸들러 내부에서 자체적으로 인가를
+  수행한다 — 특히 AI 파이프라인 라우트들은 손님도 호출해야 하므로 의도적으로 인증 검사가 전혀
+  없다.
+- `/sign-up`, `/complete-profile`은 삭제되었다. `/sign-in`은 남아 있으나 관리자 로그인 전용이며
+  일반 사용자 동선 어디에서도 링크되지 않는다.
+- `requireMember()`(`lib/server/auth/authorize.ts`)는 이제 "로그인한 회원 본인"이 아니라 "활성
+  회원을 선택한 매니저인지"를 의미하며, `POST /api/records`에서만 쓰인다.
+
+**저장**: 활성 회원을 선택한 매니저가 진행한 문진 결과만 Neon Postgres(Drizzle)의
+`medical_records` 테이블에 영구 저장된다 — 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한
+텍스트만 저장한다. `medical_records`는 더 이상 `clerkUserId`나 자유 텍스트 `organizationId`를
+갖지 않고, `memberId`(→ `members.id`)와 `organizationId`(→ `organizations.id`) FK로 회원·조직에
+연결된다. `documentTexts`(jsonb `string[]`, 업로드 문서별 추출 텍스트 — 기존의 단일
+`prescriptionText`를 대체)와 `recordingText`(nullable, 음성 녹음 전사)가 문서/녹음을 각각
+보존하고, `notableFindings`(nullable)는 종합 소견의 `redFlags`를 요약해 채운다(기존에 있었지만
+한 번도 채워지지 않았던 `historicalComparisonNote`를 대체). `POST /api/records`
+(`app/api/records/route.ts`)는 `requireMember()`로 보호되어 실패 시 401 `저장 권한이 없습니다.`를
+반환하며, `memberId`/`organizationId`를 클라이언트가 보내는 값이 아니라 매니저 세션에서 직접
+파생한다 — 손님은 `InterviewApp`의 `canSave` prop이 저장 요청 자체를 막아 이 엔드포인트를 호출하지
+않는다. 회원 본인 로그인이 없으므로 `GET /api/records`나 `listRecordsForUser` 같은 개인별 히스토리
+조회는 없다. 대신 `lib/server/records/repository.ts`의 `listRecordsForOrganization`이
+`medical_records`를 `members`와 조인해 레코드마다 `memberName`을 함께 반환하고(회원명 오름차순 →
+문진일 내림차순 정렬), `components/ManagerDashboard.tsx`의 기록 테이블은 (예전의 전화번호 컬럼
+대신) 회원명 컬럼과 (예전의 과거비교 특이사항 컬럼 대신) `notableFindings` 기반 특이사항 컬럼을
+보여준다.
+
+`getPatientProfile()`(`lib/server/auth/patientProfile.ts`)도 Clerk `unsafeMetadata`가 아니라
+세션에서 값을 읽는다: 세션이 없으면 `null`, 매니저 세션이지만 `activeMemberId`가 없으면 `null`,
+있으면 `findMemberById`로 회원 행을 조회해 `{ ageBand, gender, occupation }`을 반환한다(이름·
+전화번호는 의도적으로 제외 — AI 프롬프트에 전달되지 않는다). `lib/agents/patientProfile.ts`의
+`PatientProfile` 타입과 `formatPatientProfileLine`은 값의 출처만 바뀌었을 뿐 그대로다.
+
+자세한 아키텍처는 `docs/superpowers/specs/2026-09-13-manager-member-phone-auth-design.md`(최신,
+이 모델의 근거)를 참고. 배경 문서인
+`docs/superpowers/specs/2026-09-11-accounts-medical-records-design.md`,
+`docs/superpowers/plans/2026-09-11-accounts-medical-records-plan.md`,
+`docs/superpowers/specs/2026-09-12-onboarding-profile-design.md`는 당시 Clerk 기반 회원 로그인/
+Clerk Organizations 모델을 설명하며 위 내용으로 대체되었지만, 그 이전 라운드의 배경으로 남겨둔다.
 
 ## 응급 감지 안전장치
 
