@@ -9,13 +9,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // to authorize a later /api/records save — exactly the kind of cross-layer gap that let the
 // CRITICAL clearActiveMember-not-wired finding survive 18 individual task reviews.
 //
-// '@clerk/nextjs/server' and 'next/headers' are mocked (no real Clerk/Next.js server runtime
-// is available in this test environment); 'next/headers'' cookies() returns one shared
+// 'next/headers' is mocked (no real Next.js server runtime is available in this test
+// environment); its cookies() returns one shared
 // in-memory store for the whole test, simulating a browser holding the session cookie across
 // the three requests below. lib/server/auth/session.ts and lib/server/auth/authorize.ts run
 // for real.
 
-const authMock = vi.fn();
 const findManagerByPhoneNumberMock = vi.fn();
 const findMemberInOrganizationMock = vi.fn();
 const createRecordMock = vi.fn();
@@ -30,11 +29,6 @@ const cookieStore = {
     cookieState.delete(name);
   },
 };
-
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: () => authMock(),
-  clerkClient: async () => ({ users: { getUser: vi.fn() } }),
-}));
 
 vi.mock('next/headers', () => ({
   cookies: async () => cookieStore,
@@ -60,8 +54,6 @@ describe('manager-entry -> select-member -> records save (real session/cookie, D
   beforeEach(() => {
     process.env.SESSION_SECRET = 'test-session-secret-only-for-vitest-do-not-use-elsewhere';
     cookieState.clear();
-    authMock.mockReset();
-    authMock.mockResolvedValue({ userId: null }); // no Clerk session anywhere in this flow
     findManagerByPhoneNumberMock.mockReset();
     findMemberInOrganizationMock.mockReset();
     createRecordMock.mockReset();

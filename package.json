@@ -12,7 +12,6 @@
     "seed:admin": "dotenv -e .env.local -- tsx scripts/seed-admin.ts"
   },
   "dependencies": {
-    "@clerk/nextjs": "^7.9.2",
     "@neondatabase/serverless": "^1.1.0",
     "ai": "^7.0.83",
     "drizzle-orm": "^0.45.2",
