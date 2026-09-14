@@ -133,13 +133,26 @@
 ## 회원/저장 아키텍처
 
 역할은 관리자(admin)/매니저(manager)/손님(guest) 3계층이며, 회원(member)은 로그인하지 않는
-대상이다. `lib/server/auth/authorize.ts`의 `getViewer()`가 Clerk admin 확인 → `readSession()`
-(매니저 쿠키) → 없으면 `guest` 순으로 판정한다. `ViewerRole`에는 더 이상 독립된 `'member'` 값이
-없다 — `Viewer = { role, userId, organizationId, managerId?, activeMemberId? }`.
+대상이다. `lib/server/auth/authorize.ts`의 `getViewer()`는 Clerk을 전혀 쓰지 않고 오직
+`readSession()`만으로 역할을 판정한다 — admin 역할 세션 쿠키면 `admin`, manager 역할 세션 쿠키면
+`manager`, 세션이 없으면 `guest`. `ViewerRole`에는 더 이상 독립된 `'member'` 값이 없다 —
+`Viewer = { role, organizationId, adminId?, managerId?, activeMemberId? }`(더 이상 `userId`
+필드가 없다).
 
-- **관리자(admin)**: 기존과 동일하게 Clerk 이메일+비밀번호 로그인, `publicMetadata.role === 'admin'`,
-  `requireAdmin()`으로 보호.
-- **매니저(manager)**: Clerk 계정이 없다. `lib/server/db/schema.ts`의 `managers` 테이블
+- **관리자(admin)**: Clerk 계정도 비밀번호도 없다. `lib/server/db/schema.ts`의 `admins` 테이블
+  (`id`/`phoneNumber` unique/`name`/`createdAt` — `organizationId`가 없다, 조직에 속하지 않는
+  전역 역할이기 때문이다)에 등록된 관리자 전화번호를 보관하며, 이 테이블은 로컬 스크립트
+  `npm run seed:admin -- <전화번호> <이름>`(`scripts/seed-admin.ts`, `lib/server/admins/repository.ts`의
+  `createAdmin`을 직접 호출한다)으로만 부트스트랩된다 — admin 행을 만드는 공개 HTTP 라우트는
+  없다. 관리자가 `app/admin-entry/page.tsx`에서 전화번호를 제출하면 `POST /api/admin-entry`가
+  `findAdminByPhoneNumber`로 조회하고, 일치하면 `lib/server/auth/session.ts`의
+  `createAdminSession(adminId)`이 매니저와 동일한 `hd_session` 쿠키 포맷을 발급한다(다만
+  `role: 'manager'`/`managerId`/`organizationId` 대신 `role: 'admin'`과 `adminId`를 담는다).
+  `requireAdmin()`으로 보호되며, manager-entry와 동일하게 IP당 5분에 10회로 속도 제한된다.
+  `/manager-entry`와 `/admin-entry` 둘 다 `components/PhoneEntryForm.tsx`(title/description/
+  apiPath/redirectPath를 props로 받는 공용 컴포넌트, 기존의 단일 목적 `ManagerEntryForm`을
+  대체했다)를 렌더한다.
+- **매니저(manager)**: 관리자와 마찬가지로 Clerk 계정이 없다. `lib/server/db/schema.ts`의 `managers` 테이블
   (`id`/`organizationId` FK/`phoneNumber` unique/`position`/`createdAt`)에 관리자가 등록해둔
   전화번호를 `app/manager-entry/page.tsx`의 입력 폼에 제출하면 `POST /api/manager-entry`가
   `findManagerByPhoneNumber`(`lib/server/organizations/repository.ts`)로 조회하고, 일치하면
@@ -158,13 +171,17 @@
   렌더한다 — 실제 네비게이션 없이 인라인 전환이다(게스트의 `getViewer()`는 항상 `guest`를
   반환하므로 `/`로 다시 이동시키면 무한 루프가 되기 때문에 의도적으로 네비게이션을 쓰지 않는다).
   "매니저 전화번호 입장" 링크는 `/manager-entry`로 연결된다.
-- `proxy.ts` 미들웨어는 이제 `/admin(.*)`, `/api/admin(.*)`만 Clerk로 보호한다. 대시보드, 기록
-  저장, AI 문진 파이프라인(`/api/triage`, `/api/specialists`, `/api/interview`, `/api/synthesize`,
-  `/api/intake`)을 포함한 나머지 모든 라우트는 각 라우트 핸들러 내부에서 자체적으로 인가를
+- `proxy.ts` 미들웨어는 더 이상 존재하지 않는다(삭제됨) — 앱 전체에 미들웨어 기반 라우트 보호가
+  없다. admin 라우트(`app/admin/page.tsx`, `app/api/admin/organizations/route.ts`,
+  `app/api/admin/managers/route.ts`)를 포함해 대시보드, 기록 저장, AI 문진 파이프라인
+  (`/api/triage`, `/api/specialists`, `/api/interview`, `/api/synthesize`, `/api/intake`) 등
+  모든 라우트가 각자의 핸들러 내부에서 `requireAdmin()`/`getViewer()` 등으로 자체적으로 인가를
   수행한다 — 특히 AI 파이프라인 라우트들은 손님도 호출해야 하므로 의도적으로 인증 검사가 전혀
   없다.
-- `/sign-up`, `/complete-profile`은 삭제되었다. `/sign-in`은 남아 있으나 관리자 로그인 전용이며
-  일반 사용자 동선 어디에서도 링크되지 않는다.
+- `/sign-up`, `/sign-in`, `/complete-profile`은 모두 삭제되었다 — 이 앱은 이제 Clerk을 어디서도
+  쓰지 않는다. 관리자 진입점은 `/admin-entry`이며(`/manager-entry`와 동일하게 전화번호만 입력하는
+  방식), 매니저 진입점과 마찬가지로 `WelcomeScreen`의 일반 사용자 동선 어디에서도 링크되지 않고
+  URL을 직접 입력해 접근한다.
 - `requireMember()`(`lib/server/auth/authorize.ts`)는 이제 "로그인한 회원 본인"이 아니라 "활성
   회원을 선택한 매니저인지"를 의미하며, `POST /api/records`에서만 쓰인다.
 

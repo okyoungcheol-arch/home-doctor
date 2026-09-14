@@ -26,6 +26,12 @@ describe('getPatientProfile', () => {
     expect(findMemberInOrganizationMock).not.toHaveBeenCalled();
   });
 
+  it('returns null for an admin session', async () => {
+    readSessionMock.mockResolvedValue({ role: 'admin', adminId: 'admin_1' });
+    expect(await getPatientProfile()).toBeNull();
+    expect(findMemberInOrganizationMock).not.toHaveBeenCalled();
+  });
+
   it('returns null for a manager session with no activeMemberId', async () => {
     readSessionMock.mockResolvedValue({
       role: 'manager',

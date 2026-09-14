@@ -8,6 +8,7 @@ async function main() {
   const name = process.argv[3];
   if (!phoneNumber || !name) {
     console.error('사용법: npm run seed:admin -- <전화번호> <이름>');
+    console.error('  전화번호는 /admin-entry에서 로그인 시 입력할 형식과 정확히 일치해야 합니다(하이픈 포함 여부 등 — 정확한 문자열 일치로 조회됩니다).');
     process.exit(1);
   }
 

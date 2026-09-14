@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     // Worktrees under .claude/worktrees/** have their own node_modules; without this
     // exclude, vitest run from the repo root also picks up their test files and resolves
-    // imports against a second copy of the same packages (e.g. @clerk/nextjs), which
+    // imports against a second copy of the same packages (e.g. drizzle-orm), which
     // breaks module-identity checks like `server-only`.
     exclude: [...configDefaults.exclude, '.claude/**'],
   },

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { InterviewApp } from '@/components/InterviewApp';
 
 // 게스트는 세션이 전혀 없으므로 "손님입장"은 서버 왕복 없이 로컬 상태로만 전환한다.
-// 관리자 로그인은 일반 사용자 동선에 노출하지 않는다 — 관리자는 /sign-in을 직접 입력해 접근한다.
+// 관리자 로그인은 일반 사용자 동선에 노출하지 않는다 — 관리자는 /admin-entry를 직접 입력해 접근한다.
 export function WelcomeScreen() {
   const [entered, setEntered] = useState(false);
 
