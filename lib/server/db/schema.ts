@@ -29,6 +29,7 @@ export const members = pgTable('members', {
   gender: text('gender').notNull(), // GENDER_OPTIONS와 동일한 값 재사용
   ageBand: text('age_band').notNull(), // AGE_BANDS와 동일한 값 재사용 (이미 5세 구간)
   occupation: text('occupation').notNull(),
+  consentSignatureUrl: text('consent_signature_url'), // nullable — 기존 회원은 서명 없음, 신규 등록만 API/화면에서 필수로 강제
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

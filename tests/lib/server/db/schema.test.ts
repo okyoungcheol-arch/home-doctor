@@ -33,6 +33,7 @@ describe('members schema', () => {
       'gender',
       'ageBand',
       'occupation',
+      'consentSignatureUrl',
       'createdAt',
     ]);
   });
