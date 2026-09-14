@@ -6,6 +6,13 @@ export const organizations = pgTable('organizations', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const admins = pgTable('admins', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  phoneNumber: text('phone_number').notNull().unique(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const managers = pgTable('managers', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id').notNull().references(() => organizations.id),
@@ -47,6 +54,9 @@ export const medicalRecords = pgTable('medical_records', {
 
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
+
+export type Admin = typeof admins.$inferSelect;
+export type NewAdmin = typeof admins.$inferInsert;
 
 export type Manager = typeof managers.$inferSelect;
 export type NewManager = typeof managers.$inferInsert;

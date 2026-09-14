@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getTableColumns } from 'drizzle-orm';
-import { organizations, managers, members, medicalRecords } from '@/lib/server/db/schema';
+import { organizations, managers, members, medicalRecords, admins } from '@/lib/server/db/schema';
 
 describe('organizations schema', () => {
   it('defines the expected columns', () => {
@@ -57,5 +57,12 @@ describe('medicalRecords schema', () => {
       'isCritical',
       'createdAt',
     ]);
+  });
+});
+
+describe('admins schema', () => {
+  it('defines the expected columns', () => {
+    const columns = Object.keys(getTableColumns(admins));
+    expect(columns).toEqual(['id', 'phoneNumber', 'name', 'createdAt']);
   });
 });
