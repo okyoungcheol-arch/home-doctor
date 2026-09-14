@@ -149,18 +149,27 @@
   `createAdminSession(adminId)`이 매니저와 동일한 `hd_session` 쿠키 포맷을 발급한다(다만
   `role: 'manager'`/`managerId`/`organizationId` 대신 `role: 'admin'`과 `adminId`를 담는다).
   `requireAdmin()`으로 보호되며, manager-entry와 동일하게 IP당 5분에 10회로 속도 제한된다.
-  `/manager-entry`와 `/admin-entry` 둘 다 `components/PhoneEntryForm.tsx`(title/description/
-  apiPath/redirectPath를 props로 받는 공용 컴포넌트, 기존의 단일 목적 `ManagerEntryForm`을
-  대체했다)를 렌더한다.
+  `/admin-entry`는 `components/PhoneEntryForm.tsx`(title/description/apiPath/redirectPath를
+  props로 받는 공용 컴포넌트, 기존의 단일 목적 `ManagerEntryForm`을 대체했다)를 렌더한다 —
+  전용 페이지가 남아있는 진입점은 이제 관리자뿐이다(매니저는 아래 참고).
 - **매니저(manager)**: 관리자와 마찬가지로 Clerk 계정이 없다. `lib/server/db/schema.ts`의 `managers` 테이블
   (`id`/`organizationId` FK/`phoneNumber` unique/`position`/`createdAt`)에 관리자가 등록해둔
-  전화번호를 `app/manager-entry/page.tsx`의 입력 폼에 제출하면 `POST /api/manager-entry`가
-  `findManagerByPhoneNumber`(`lib/server/organizations/repository.ts`)로 조회하고, 일치하면
-  `lib/server/auth/session.ts`의 `createManagerSession(managerId, organizationId)`이 서명된
-  HttpOnly 쿠키(`hd_session`, `jose` HS256 JWT, 비밀키는 `SESSION_SECRET`, 만료 30일 — 시설
-  비치 태블릿/키오스크에 로그인 상태를 유지하는 용도라 방문 세션이 아닌 긴 만료를 쓴다)를 발급한다.
-  비밀번호/PIN/OTP는 없다 — 전화번호 자체가 자격 증명이며, 개인/학습용 프로토타입 전제의 명시적
-  저보안 트레이드오프다.
+  전화번호를 `components/WelcomeScreen.tsx`(첫 화면)에 내장된 입력 폼에 제출하면 `POST
+  /api/manager-entry`가 `findManagerByPhoneNumber`(`lib/server/organizations/repository.ts`)로
+  조회하고, 일치하면 `lib/server/auth/session.ts`의 `createManagerSession(managerId,
+  organizationId)`이 서명된 HttpOnly 쿠키(`hd_session`, `jose` HS256 JWT, 비밀키는
+  `SESSION_SECRET`, 만료 30일 — 시설 비치 태블릿/키오스크에 로그인 상태를 유지하는 용도라 방문
+  세션이 아닌 긴 만료를 쓴다)를 발급한다. 비밀번호/PIN/OTP는 없다 — 전화번호 자체가 자격
+  증명이며, 개인/학습용 프로토타입 전제의 명시적 저보안 트레이드오프다. 로그인 성공 시 입력한
+  전화번호를 `localStorage`(`lib/phone.ts`의 `MANAGER_PHONE_STORAGE_KEY`)에도 저장해두고,
+  `WelcomeScreen` 마운트 시 저장된 번호가 있으면 자동으로 `POST /api/manager-entry`를 다시
+  호출해 즉시 `/dashboard`로 이동한다(실패하면 저장된 번호를 지우고 평소 입력 화면으로 전환) —
+  같은 기기를 계속 쓰는 태블릿/키오스크에서 매번 전화번호를 다시 입력하지 않도록 하기 위함이다.
+  대시보드의 "다른 계정으로 로그인" 버튼(`components/ManagerDashboard.tsx`)이 이 저장된 번호를
+  지우고 첫 화면으로 돌려보낸다. 전화번호 입력 필드들은 `lib/phone.ts`의 `formatPhoneNumber`로
+  타이핑 중 `010-1234-5678` 형태로 자동 하이픈 포맷되지만, 서버(리포지토리 계층)는 항상
+  `normalizePhoneNumber`로 숫자만 남겨 저장/조회하므로 표시 포맷과 무관하게 기존 데이터와
+  계속 일치한다.
 - **회원(member)**: 로그인 자체가 없다. `members` 테이블(`id`/`organizationId` FK/`name`/
   `phoneNumber`/`gender`/`ageBand`/`occupation`/`createdAt`, 전 필드 필수)에 매니저가
   `/dashboard`(`POST /api/dashboard/members`)에서 등록한다. 매니저가 `GET /api/dashboard/members`
@@ -170,7 +179,7 @@
   `entered` state만으로 "손님입장" 클릭 시 `<InterviewApp canSave={false} />`를 그 자리에서
   렌더한다 — 실제 네비게이션 없이 인라인 전환이다(게스트의 `getViewer()`는 항상 `guest`를
   반환하므로 `/`로 다시 이동시키면 무한 루프가 되기 때문에 의도적으로 네비게이션을 쓰지 않는다).
-  "매니저 전화번호 입장" 링크는 `/manager-entry`로 연결된다.
+  같은 화면의 매니저 전화번호 입력 폼과는 완전히 분리된 별도 버튼이다.
 - `proxy.ts` 미들웨어는 더 이상 존재하지 않는다(삭제됨) — 앱 전체에 미들웨어 기반 라우트 보호가
   없다. admin 라우트(`app/admin/page.tsx`, `app/api/admin/organizations/route.ts`,
   `app/api/admin/managers/route.ts`)를 포함해 대시보드, 기록 저장, AI 문진 파이프라인
@@ -178,10 +187,11 @@
   모든 라우트가 각자의 핸들러 내부에서 `requireAdmin()`/`getViewer()` 등으로 자체적으로 인가를
   수행한다 — 특히 AI 파이프라인 라우트들은 손님도 호출해야 하므로 의도적으로 인증 검사가 전혀
   없다.
-- `/sign-up`, `/sign-in`, `/complete-profile`은 모두 삭제되었다 — 이 앱은 이제 Clerk을 어디서도
-  쓰지 않는다. 관리자 진입점은 `/admin-entry`이며(`/manager-entry`와 동일하게 전화번호만 입력하는
-  방식), 매니저 진입점과 마찬가지로 `WelcomeScreen`의 일반 사용자 동선 어디에서도 링크되지 않고
-  URL을 직접 입력해 접근한다.
+- `/sign-up`, `/sign-in`, `/complete-profile`, `/manager-entry`는 모두 삭제되었다 — 이 앱은
+  이제 Clerk을 어디서도 쓰지 않고, 매니저 로그인도 더 이상 전용 페이지가 아니라 `WelcomeScreen`에
+  내장돼 있다. 관리자 진입점만 여전히 별도 페이지(`/admin-entry`, 전화번호만 입력하는 방식)로
+  남아있으며, 일반 사용자 동선(`WelcomeScreen`) 어디에서도 링크되지 않고 URL을 직접 입력해
+  접근한다.
 - `requireMember()`(`lib/server/auth/authorize.ts`)는 이제 "로그인한 회원 본인"이 아니라 "활성
   회원을 선택한 매니저인지"를 의미하며, `POST /api/records`에서만 쓰인다.
 

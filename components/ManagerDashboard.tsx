@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Member } from '@/lib/server/db/schema';
 import type { MedicalRecordWithMemberName } from '@/lib/server/records/repository';
 import { AGE_BANDS, GENDER_OPTIONS, OCCUPATIONS, type Gender } from '@/lib/profile/constants';
+import { formatPhoneNumber, MANAGER_PHONE_STORAGE_KEY } from '@/lib/phone';
 
 type DisplayRecord = Pick<
   MedicalRecordWithMemberName,
@@ -68,7 +69,7 @@ function MemberRegistrationForm({ onRegistered }: { onRegistered: () => void }) 
         <input
           type="tel"
           value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
+          onChange={(e) => setPhoneNumber(formatPhoneNumber(e.target.value))}
           placeholder="010-1234-5678"
           required
           className="rounded-8 border border-line-normal p-2 text-sm"
@@ -227,8 +228,24 @@ export function ManagerDashboard() {
       .catch(() => setStatus('error'));
   }, []);
 
+  function handleSwitchAccount() {
+    try {
+      localStorage.removeItem(MANAGER_PHONE_STORAGE_KEY);
+    } catch {
+      // ignore — 스토리지 접근이 막혀 있어도 이동 자체는 진행한다
+    }
+    window.location.href = '/';
+  }
+
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
+      <button
+        type="button"
+        onClick={handleSwitchAccount}
+        className="self-end text-sm text-label-alternative underline hover:text-primary-normal"
+      >
+        다른 계정으로 로그인
+      </button>
       <MemberRegistrationForm onRegistered={() => setMembersRefreshKey((key) => key + 1)} />
       <MemberSelectionList key={membersRefreshKey} />
       <RecordsTable records={records} status={status} />

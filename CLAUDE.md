@@ -37,7 +37,7 @@
   `createAdminSession`이 세션 쿠키 발급). 최초 admin 계정은 웹 UI가 아니라 로컬 스크립트
   `npm run seed:admin -- <전화번호> <이름>`으로 DB에 직접 등록한다. 매니저는 관리자가 등록해둔
   전화번호를 입력하는 것만으로 입장한다
-  (`app/manager-entry/page.tsx` → `POST /api/manager-entry` → `managers` 테이블 조회 성공 시
+  (`components/WelcomeScreen.tsx`에 내장된 입력 폼 → `POST /api/manager-entry` → `managers` 테이블 조회 성공 시
   `lib/server/auth/session.ts`의 `createManagerSession`이 서명된 HttpOnly 쿠키(`hd_session`, `jose`
   JWT, 30일 만료)를 발급 — 관리자·매니저 모두 비밀번호/PIN/OTP 없음, 개인/학습용 프로토타입
   전제의 낮은 보안 수준으로 의도된 것). 회원은 매니저가 이름·전화번호·성별·연령대·직업을 모두 입력해 등록해두는 대상이며

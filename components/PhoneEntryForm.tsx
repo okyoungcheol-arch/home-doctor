@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatPhoneNumber } from '@/lib/phone';
 
 type PhoneEntryFormProps = {
   title: string;
@@ -58,7 +59,7 @@ export function PhoneEntryForm({ title, description, apiPath, redirectPath }: Ph
           <input
             type="tel"
             value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
+            onChange={(e) => setPhoneNumber(formatPhoneNumber(e.target.value))}
             placeholder="010-1234-5678"
             required
             className="rounded-8 border border-line-normal p-2 text-sm"
