@@ -86,7 +86,6 @@ describe('manager-entry -> select-member -> records save (real session/cookie, D
     // getViewer() now reads the real cookie just set above.
     expect(await getViewer()).toEqual({
       role: 'manager',
-      userId: null,
       organizationId: 'org_1',
       managerId: 'manager_1',
     });
@@ -111,7 +110,6 @@ describe('manager-entry -> select-member -> records save (real session/cookie, D
     // getViewer() now reflects the updated cookie with activeMemberId set.
     expect(await getViewer()).toEqual({
       role: 'manager',
-      userId: null,
       organizationId: 'org_1',
       managerId: 'manager_1',
       activeMemberId: 'member_1',
@@ -154,7 +152,6 @@ describe('manager-entry -> select-member -> records save (real session/cookie, D
     // finding (a stale activeMemberId sticking around for the next patient on a shared tablet).
     expect(await getViewer()).toEqual({
       role: 'manager',
-      userId: null,
       organizationId: 'org_1',
       managerId: 'manager_1',
     });

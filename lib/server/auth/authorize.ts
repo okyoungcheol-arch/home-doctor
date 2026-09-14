@@ -1,12 +1,11 @@
-import { auth, clerkClient } from '@clerk/nextjs/server';
 import { readSession } from '@/lib/server/auth/session';
 
 export type ViewerRole = 'guest' | 'admin' | 'manager';
 
 export type Viewer = {
   role: ViewerRole;
-  userId: string | null;
   organizationId: string | null;
+  adminId?: string;
   managerId?: string;
   activeMemberId?: string;
 };
@@ -14,22 +13,15 @@ export type Viewer = {
 export class AuthorizationError extends Error {}
 
 export async function getViewer(): Promise<Viewer> {
-  const { userId } = await auth();
+  const session = await readSession();
 
-  if (userId) {
-    const client = await clerkClient();
-    const user = await client.users.getUser(userId);
-    const isAdmin = (user.publicMetadata as { role?: string } | null | undefined)?.role === 'admin';
-    if (isAdmin) {
-      return { role: 'admin', userId, organizationId: null };
-    }
+  if (session?.role === 'admin') {
+    return { role: 'admin', organizationId: null, adminId: session.adminId };
   }
 
-  const session = await readSession();
-  if (session) {
+  if (session?.role === 'manager') {
     const viewer: Viewer = {
       role: 'manager',
-      userId: null,
       organizationId: session.organizationId,
       managerId: session.managerId,
     };
@@ -39,7 +31,7 @@ export async function getViewer(): Promise<Viewer> {
     return viewer;
   }
 
-  return { role: 'guest', userId: null, organizationId: null };
+  return { role: 'guest', organizationId: null };
 }
 
 export async function requireAdmin(): Promise<Viewer> {
