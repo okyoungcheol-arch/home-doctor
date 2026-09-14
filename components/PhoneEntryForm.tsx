@@ -3,7 +3,14 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
-export function ManagerEntryForm() {
+type PhoneEntryFormProps = {
+  title: string;
+  description: string;
+  apiPath: string;
+  redirectPath: string;
+};
+
+export function PhoneEntryForm({ title, description, apiPath, redirectPath }: PhoneEntryFormProps) {
   const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -14,14 +21,14 @@ export function ManagerEntryForm() {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch('/api/manager-entry', {
+      const response = await fetch(apiPath, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber }),
       });
 
       if (response.ok) {
-        router.push('/dashboard');
+        router.push(redirectPath);
         return;
       }
 
@@ -40,8 +47,8 @@ export function ManagerEntryForm() {
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-      <h1 className="text-2xl font-bold">매니저 입장</h1>
-      <p className="text-sm text-label-alternative">등록된 전화번호를 입력해주세요.</p>
+      <h1 className="text-2xl font-bold">{title}</h1>
+      <p className="text-sm text-label-alternative">{description}</p>
       <form
         onSubmit={handleSubmit}
         className="flex flex-col gap-3 rounded-12 border border-line-normal bg-background-elevated p-6 shadow-sm"
