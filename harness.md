@@ -165,16 +165,21 @@
   `WelcomeScreen` 마운트 시 저장된 번호가 있으면 자동으로 `POST /api/manager-entry`를 다시
   호출해 즉시 `/dashboard`로 이동한다(실패하면 저장된 번호를 지우고 평소 입력 화면으로 전환) —
   같은 기기를 계속 쓰는 태블릿/키오스크에서 매번 전화번호를 다시 입력하지 않도록 하기 위함이다.
-  대시보드의 "다른 계정으로 로그인" 버튼(`components/ManagerDashboard.tsx`)이 이 저장된 번호를
-  지우고 첫 화면으로 돌려보낸다. 전화번호 입력 필드들은 `lib/phone.ts`의 `formatPhoneNumber`로
+  `/dashboard` 계열 페이지 상단의 "다른 계정으로 로그인" 버튼(`components/DashboardNav.tsx`,
+  `app/dashboard/layout.tsx`가 렌더)이 이 저장된 번호를 지우고 첫 화면으로 돌려보낸다. 전화번호
+  입력 필드들은 `lib/phone.ts`의 `formatPhoneNumber`로
   타이핑 중 `010-1234-5678` 형태로 자동 하이픈 포맷되지만, 서버(리포지토리 계층)는 항상
   `normalizePhoneNumber`로 숫자만 남겨 저장/조회하므로 표시 포맷과 무관하게 기존 데이터와
   계속 일치한다.
 - **회원(member)**: 로그인 자체가 없다. `members` 테이블(`id`/`organizationId` FK/`name`/
   `phoneNumber`/`gender`/`ageBand`/`occupation`/`createdAt`, 전 필드 필수)에 매니저가
-  `/dashboard`(`POST /api/dashboard/members`)에서 등록한다. 매니저가 `GET /api/dashboard/members`
-  목록에서 회원을 선택하면 `POST /api/dashboard/select-member`가 `setActiveMember(memberId)`로
-  세션 쿠키에 `activeMemberId`를 추가하고, 그 회원 명의로 문진이 진행된다.
+  `/dashboard/register`(`components/MemberRegistrationScreen.tsx` → `POST
+  /api/dashboard/members`)에서 등록한다. `/dashboard`(`components/InterviewStartScreen.tsx`)는
+  회원 등록과는 분리된 별도 화면으로, `GET /api/dashboard/members` 목록에서 회원을 선택하면
+  `POST /api/dashboard/select-member`가 `setActiveMember(memberId)`로 세션 쿠키에
+  `activeMemberId`를 추가하고, 그 회원 명의로 문진이 진행된다. `app/dashboard/layout.tsx`가
+  두 페이지 모두에 대해 매니저 세션(`role !== 'manager'`면 `/`로 redirect)을 한 번만 확인하고
+  공용 내비게이션(`DashboardNav`)을 렌더한다.
 - **손님(guest)**: 세션이 전혀 없다. `components/WelcomeScreen.tsx`(클라이언트 컴포넌트)가 로컬
   `entered` state만으로 "손님입장" 클릭 시 `<InterviewApp canSave={false} />`를 그 자리에서
   렌더한다 — 실제 네비게이션 없이 인라인 전환이다(게스트의 `getViewer()`는 항상 `guest`를
@@ -220,8 +225,8 @@
 회원 본인 로그인이 없으므로 `GET /api/records`나
 `listRecordsForUser` 같은 개인별 히스토리 조회는 없다. 대신 `lib/server/records/repository.ts`의
 `listRecordsForOrganization`이 `medical_records`를 `members`와 조인해 레코드마다 `memberName`을
-함께 반환하고(회원명 오름차순 → 문진일 내림차순 정렬), `components/ManagerDashboard.tsx`의 기록
-테이블은 (예전의 전화번호 컬럼 대신) 회원명 컬럼과 (예전의 과거비교 특이사항 컬럼 대신)
+함께 반환하고(회원명 오름차순 → 문진일 내림차순 정렬), `components/InterviewStartScreen.tsx`의
+기록 테이블은 (예전의 전화번호 컬럼 대신) 회원명 컬럼과 (예전의 과거비교 특이사항 컬럼 대신)
 `notableFindings` 기반 특이사항 컬럼을 보여준다. `listRecordsForMember(memberId)`는 §7의 종합
 단계가 과거 기록 비교에 쓰는 별도 조회 함수다.
 
