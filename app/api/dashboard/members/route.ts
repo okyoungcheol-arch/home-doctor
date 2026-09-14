@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireManager } from '@/lib/server/auth/authorize';
 import { createMember, listMembersForOrganization } from '@/lib/server/organizations/repository';
+import { uploadSignature } from '@/lib/server/blob';
 import { AGE_BANDS, GENDER_VALUES, OCCUPATIONS } from '@/lib/profile/constants';
 import { guard, parseJsonBody } from '@/lib/server/http';
 
@@ -11,6 +12,7 @@ const createMemberSchema = z.object({
   gender: z.enum(GENDER_VALUES),
   ageBand: z.enum(AGE_BANDS),
   occupation: z.enum(OCCUPATIONS),
+  signatureImage: z.string().regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/),
 });
 
 export async function POST(request: Request) {
@@ -25,7 +27,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
   }
 
-  const member = await createMember({ organizationId: guarded.value.organizationId!, ...parsed.data });
+  const signatureBuffer = Buffer.from(
+    parsed.data.signatureImage.replace(/^data:image\/png;base64,/, ''),
+    'base64',
+  );
+
+  let signatureUrl: string;
+  try {
+    signatureUrl = await uploadSignature(guarded.value.organizationId!, signatureBuffer);
+  } catch {
+    return NextResponse.json({ error: '서명 저장에 실패했습니다.' }, { status: 500 });
+  }
+
+  const member = await createMember({
+    organizationId: guarded.value.organizationId!,
+    name: parsed.data.name,
+    phoneNumber: parsed.data.phoneNumber,
+    gender: parsed.data.gender,
+    ageBand: parsed.data.ageBand,
+    occupation: parsed.data.occupation,
+    consentSignatureUrl: signatureUrl,
+  });
 
   return NextResponse.json({ member });
 }
