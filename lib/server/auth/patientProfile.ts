@@ -9,7 +9,7 @@ function readEnumField<T extends string>(raw: unknown, allowed: readonly T[]): T
 
 export async function getPatientProfile(): Promise<PatientProfile | null> {
   const session = await readSession();
-  if (!session || !session.activeMemberId) return null;
+  if (!session || session.role !== 'manager' || !session.activeMemberId) return null;
 
   // findMemberInOrganization scopes the lookup to the session's own organizationId at the DB
   // level, so a member belonging to a different organization comes back as null here exactly
