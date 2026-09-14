@@ -14,6 +14,7 @@ import {
   encodeSessionToken,
   decodeSessionToken,
   createManagerSession,
+  createAdminSession,
   setActiveMember,
   clearActiveMember,
   readSession,
@@ -122,6 +123,13 @@ describe('encodeSessionToken / decodeSessionToken (pure JWT helpers)', () => {
     expect(decoded).toBeNull();
   });
 
+  it('round-trips an admin payload', async () => {
+    const payload: SessionPayload = { role: 'admin', adminId: 'admin-1' };
+    const token = await encodeSessionToken(payload);
+    const decoded = await decodeSessionToken(token);
+    expect(decoded).toEqual(payload);
+  });
+
   it('throws (does not return null) when SESSION_SECRET is unset — a config error, not "no session"', async () => {
     const payload: SessionPayload = {
       role: 'manager',
@@ -153,6 +161,26 @@ describe('createManagerSession', () => {
 
     const decoded = await decodeSessionToken(token);
     expect(decoded).toEqual({ role: 'manager', managerId: 'manager-1', organizationId: 'org-1' });
+  });
+});
+
+describe('createAdminSession', () => {
+  it('sets a signed session cookie with the expected flags', async () => {
+    await createAdminSession('admin-1');
+
+    expect(cookieStore.set).toHaveBeenCalledTimes(1);
+    const [name, token, options] = cookieStore.set.mock.calls[0];
+    expect(name).toBe(SESSION_COOKIE_NAME);
+    expect(options).toMatchObject({
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: SESSION_MAX_AGE_SECONDS,
+    });
+
+    const decoded = await decodeSessionToken(token);
+    expect(decoded).toEqual({ role: 'admin', adminId: 'admin-1' });
   });
 });
 
@@ -222,6 +250,14 @@ describe('setActiveMember', () => {
       activeMemberId: 'member-1',
     });
   });
+
+  it('throws when the session belongs to an admin, not a manager', async () => {
+    const token = await encodeSessionToken({ role: 'admin', adminId: 'admin-1' });
+    cookieStore.get.mockReturnValue({ value: token });
+
+    await expect(setActiveMember('member-1')).rejects.toThrow();
+    expect(cookieStore.set).not.toHaveBeenCalled();
+  });
 });
 
 describe('clearActiveMember', () => {
@@ -250,5 +286,13 @@ describe('clearActiveMember', () => {
       managerId: 'manager-1',
       organizationId: 'org-1',
     });
+  });
+
+  it('throws when the session belongs to an admin, not a manager', async () => {
+    const token = await encodeSessionToken({ role: 'admin', adminId: 'admin-1' });
+    cookieStore.get.mockReturnValue({ value: token });
+
+    await expect(clearActiveMember()).rejects.toThrow();
+    expect(cookieStore.set).not.toHaveBeenCalled();
   });
 });

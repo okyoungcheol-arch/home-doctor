@@ -1,12 +1,9 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
-export type SessionPayload = {
-  role: 'manager';
-  managerId: string;
-  organizationId: string;
-  activeMemberId?: string;
-};
+export type SessionPayload =
+  | { role: 'manager'; managerId: string; organizationId: string; activeMemberId?: string }
+  | { role: 'admin'; adminId: string };
 
 export const SESSION_COOKIE_NAME = 'hd_session';
 
@@ -27,16 +24,22 @@ function isSessionPayload(value: unknown): value is SessionPayload {
     return false;
   }
   const candidate = value as Record<string, unknown>;
-  if (candidate.role !== 'manager') {
-    return false;
+
+  if (candidate.role === 'admin') {
+    return typeof candidate.adminId === 'string';
   }
-  if (typeof candidate.managerId !== 'string' || typeof candidate.organizationId !== 'string') {
-    return false;
+
+  if (candidate.role === 'manager') {
+    if (typeof candidate.managerId !== 'string' || typeof candidate.organizationId !== 'string') {
+      return false;
+    }
+    if (candidate.activeMemberId !== undefined && typeof candidate.activeMemberId !== 'string') {
+      return false;
+    }
+    return true;
   }
-  if (candidate.activeMemberId !== undefined && typeof candidate.activeMemberId !== 'string') {
-    return false;
-  }
-  return true;
+
+  return false;
 }
 
 /**
@@ -71,8 +74,11 @@ export async function decodeSessionToken(token: string): Promise<SessionPayload 
     if (!isSessionPayload(payload)) {
       return null;
     }
+    if (payload.role === 'admin') {
+      return { role: 'admin', adminId: payload.adminId };
+    }
     const result: SessionPayload = {
-      role: payload.role,
+      role: 'manager',
       managerId: payload.managerId,
       organizationId: payload.organizationId,
     };
@@ -106,6 +112,15 @@ export async function createManagerSession(managerId: string, organizationId: st
 }
 
 /**
+ * 관리자 로그인 성공 시 서명된 세션 쿠키를 발급한다.
+ */
+export async function createAdminSession(adminId: string): Promise<void> {
+  const token = await encodeSessionToken({ role: 'admin', adminId });
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
+}
+
+/**
  * 현재 요청의 세션 쿠키를 검증해 페이로드를 반환한다. 쿠키가 없거나 검증에 실패하면
  * `null`을 반환한다(로그인하지 않은 정상적인 상태이므로 예외를 던지지 않는다).
  */
@@ -120,11 +135,12 @@ export async function readSession(): Promise<SessionPayload | null> {
 
 /**
  * 매니저가 특정 회원을 선택했을 때 세션에 활성 회원을 기록한다. 유효한 매니저 세션이
- * 없으면 예외를 던진다(호출 전에 라우트 핸들러가 매니저 인증을 확인했어야 한다).
+ * 없으면(세션이 없거나 admin 세션이면) 예외를 던진다(호출 전에 라우트 핸들러가 매니저 인증을
+ * 확인했어야 한다).
  */
 export async function setActiveMember(memberId: string): Promise<void> {
   const session = await readSession();
-  if (!session) {
+  if (!session || session.role !== 'manager') {
     throw new Error('활성 매니저 세션이 없습니다.');
   }
   const token = await encodeSessionToken({ ...session, activeMemberId: memberId });
@@ -137,11 +153,11 @@ export async function setActiveMember(memberId: string): Promise<void> {
  */
 export async function clearActiveMember(): Promise<void> {
   const session = await readSession();
-  if (!session) {
+  if (!session || session.role !== 'manager') {
     throw new Error('활성 매니저 세션이 없습니다.');
   }
   const token = await encodeSessionToken({
-    role: session.role,
+    role: 'manager',
     managerId: session.managerId,
     organizationId: session.organizationId,
   });
