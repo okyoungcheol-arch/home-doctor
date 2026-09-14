@@ -26,7 +26,8 @@ function jsonRequest(body: unknown) {
   return jsonRequestTo('http://localhost/api/dashboard/members', body);
 }
 
-const validSignatureImage = 'data:image/png;base64,aGVsbG8=';
+const validSignatureImage =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 describe('POST /api/dashboard/members', () => {
   beforeEach(() => {
@@ -94,7 +95,7 @@ describe('POST /api/dashboard/members', () => {
       occupation: '회사원/직장인',
       consentSignatureUrl: 'https://blob.example.com/signatures/org_1/abc.png',
     });
-    expect(data.member.consentSignatureUrl).toBe('https://blob.example.com/signatures/org_1/abc.png');
+    expect(data.member.consentSignatureUrl).toBeUndefined();
   });
 
   it('rejects malformed bodies', async () => {
@@ -168,6 +169,28 @@ describe('POST /api/dashboard/members', () => {
         ageBand: '30~34세',
         occupation: '회사원/직장인',
         signatureImage: 'not-a-data-url',
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(uploadSignatureMock).not.toHaveBeenCalled();
+    expect(createMemberMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a signatureImage that matches the base64 shape but is not real PNG data', async () => {
+    requireManagerMock.mockResolvedValue({
+      role: 'manager',
+      organizationId: 'org_1',
+      managerId: 'manager_1',
+    });
+
+    const response = await POST(
+      jsonRequest({
+        name: '홍길동',
+        phoneNumber: '010-1234-5678',
+        gender: 'male',
+        ageBand: '30~34세',
+        occupation: '회사원/직장인',
+        signatureImage: 'data:image/png;base64,aGVsbG8=',
       }),
     );
     expect(response.status).toBe(400);

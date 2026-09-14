@@ -27,6 +27,8 @@
   `docs/superpowers/plans/2026-09-13-manager-member-phone-auth-plan.md`
 - 관리자 전화번호 인증 전환(Clerk 제거): `docs/superpowers/specs/2026-09-14-admin-phone-auth-design.md`,
   `docs/superpowers/plans/2026-09-14-admin-phone-auth-plan.md`
+- 회원 등록 개인정보 동의 서명: `docs/superpowers/specs/2026-09-14-member-consent-signature-design.md`,
+  `docs/superpowers/plans/2026-09-14-member-consent-signature-plan.md`
 
 ## 핵심 전역 제약
 
@@ -49,7 +51,10 @@
   저장되며, `medical_records`는 `memberId`/`organizationId` FK로 회원·조직에 연결되고
   `documentTexts`(업로드 문서별 추출 텍스트 배열, 최대 2개)·`recordingText`(음성 녹음 전사,
   nullable)·`interviewRecord`·`notableFindings`(종합 소견의 red flag를 요약한 특이사항, nullable)
-  등을 담는다. 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다. 자세한 내용은
+  등을 담는다. 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다 — 단, 회원
+  등록 시 받는 개인정보 동의 서명 이미지는 예외로, `members.consentSignatureUrl`에 Vercel
+  Blob(`access: 'private'`) URL로 저장된다(`docs/superpowers/specs/2026-09-14-member-consent-signature-design.md`
+  참고). 자세한 내용은
   `docs/superpowers/specs/2026-09-13-manager-member-phone-auth-design.md`(매니저/회원 모델의 전체
   근거) 및 관리자 인증 전환 근거인
   `docs/superpowers/specs/2026-09-14-admin-phone-auth-design.md`, 배경 문서인

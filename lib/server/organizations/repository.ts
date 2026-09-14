@@ -52,10 +52,21 @@ export async function createMember(input: NewMember): Promise<Member> {
   return row;
 }
 
-export async function listMembersForOrganization(organizationId: string): Promise<Member[]> {
+export type MemberSummary = Omit<Member, 'consentSignatureUrl'>;
+
+export async function listMembersForOrganization(organizationId: string): Promise<MemberSummary[]> {
   const db = getDb();
   return db
-    .select()
+    .select({
+      id: members.id,
+      organizationId: members.organizationId,
+      name: members.name,
+      phoneNumber: members.phoneNumber,
+      gender: members.gender,
+      ageBand: members.ageBand,
+      occupation: members.occupation,
+      createdAt: members.createdAt,
+    })
     .from(members)
     .where(eq(members.organizationId, organizationId))
     .orderBy(asc(members.name));

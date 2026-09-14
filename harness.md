@@ -172,7 +172,9 @@
   `normalizePhoneNumber`로 숫자만 남겨 저장/조회하므로 표시 포맷과 무관하게 기존 데이터와
   계속 일치한다.
 - **회원(member)**: 로그인 자체가 없다. `members` 테이블(`id`/`organizationId` FK/`name`/
-  `phoneNumber`/`gender`/`ageBand`/`occupation`/`createdAt`, 전 필드 필수)에 매니저가
+  `phoneNumber`/`gender`/`ageBand`/`occupation`/`createdAt`는 전 필드 필수, `consentSignatureUrl`은
+  nullable — 개인정보 동의 서명 이미지의 Vercel Blob URL, 기존에 서명 없이 등록된 회원과의
+  호환을 위해 필수가 아니다)에 매니저가
   `/dashboard/register`(`components/MemberRegistrationScreen.tsx` → `POST
   /api/dashboard/members`)에서 등록한다. `/dashboard`(`components/InterviewStartScreen.tsx`)는
   회원 등록과는 분리된 별도 화면으로, `GET /api/dashboard/members` 목록에서 회원을 선택하면

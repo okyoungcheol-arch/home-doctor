@@ -12,8 +12,10 @@ const createMemberSchema = z.object({
   gender: z.enum(GENDER_VALUES),
   ageBand: z.enum(AGE_BANDS),
   occupation: z.enum(OCCUPATIONS),
-  signatureImage: z.string().regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/),
+  signatureImage: z.string().max(2_000_000).regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/),
 });
+
+const PNG_MAGIC_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 export async function POST(request: Request) {
   const guarded = await guard(requireManager, '매니저 권한이 필요합니다.', 403);
@@ -32,10 +34,15 @@ export async function POST(request: Request) {
     'base64',
   );
 
+  if (!signatureBuffer.subarray(0, 8).equals(PNG_MAGIC_BYTES)) {
+    return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 });
+  }
+
   let signatureUrl: string;
   try {
     signatureUrl = await uploadSignature(guarded.value.organizationId!, signatureBuffer);
-  } catch {
+  } catch (error) {
+    console.error('서명 이미지 업로드 실패:', error);
     return NextResponse.json({ error: '서명 저장에 실패했습니다.' }, { status: 500 });
   }
 
@@ -49,7 +56,8 @@ export async function POST(request: Request) {
     consentSignatureUrl: signatureUrl,
   });
 
-  return NextResponse.json({ member });
+  const { consentSignatureUrl: _consentSignatureUrl, ...memberResponse } = member;
+  return NextResponse.json({ member: memberResponse });
 }
 
 export async function GET() {

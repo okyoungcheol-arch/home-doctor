@@ -175,9 +175,9 @@ export function MemberRegistrationScreen() {
         onSubmit={handleSubmit}
         className="flex flex-col gap-3 rounded-12 border border-line-normal bg-background-elevated p-6 shadow-sm"
       >
-        <pre className="whitespace-pre-wrap rounded-8 border border-line-normal bg-background-normal p-3 text-sm">
+        <div className="whitespace-pre-wrap rounded-8 border border-line-normal bg-background-normal p-3 text-sm">
           {CONSENT_TEXT}
-        </pre>
+        </div>
         <SignaturePad ref={signaturePadRef} />
         <div className="flex justify-between gap-3">
           <button
