@@ -49,45 +49,87 @@ function MemberRecordsPanel({
   );
   const records = data?.records ?? [];
 
+  // 사용자가 콤보에서 고른 일자. 아직 안 골랐거나(null) 목록이 바뀌어 더는 존재하지 않는 id면
+  // 최신 기록(records[0])으로 대체한다 — 데이터 도착 시점에 state를 동기화하는 effect 없이
+  // 매 렌더에서 파생시킨다.
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const effectiveRecordId =
+    selectedRecordId && records.some((r) => r.id === selectedRecordId) ? selectedRecordId : (records[0]?.id ?? null);
+  const selectedRecord = records.find((r) => r.id === effectiveRecordId) ?? null;
+
+  // 복사 성공/실패 표시를 특정 기록 id에 묶어둔다 — 그래야 "복사됨" 표시가 다른 일자로 바꾼 뒤에도
+  // 잘못 남아있지 않는다(매번 effectiveRecordId와 비교해서만 보여줌).
+  const [copyState, setCopyState] = useState<{ recordId: string; status: 'copied' | 'error' } | null>(null);
+
+  function handleCopy() {
+    if (!selectedRecord) return;
+    const dateLabel = new Date(selectedRecord.recordDate).toLocaleDateString('ko-KR');
+    const text = `[${memberName}] ${dateLabel} 문진 특이사항\n${selectedRecord.notableFindings ?? '특이사항 없음'}`;
+    const recordId = selectedRecord.id;
+    if (!navigator.clipboard) {
+      setCopyState({ recordId, status: 'error' });
+      return;
+    }
+    navigator.clipboard
+      .writeText(text)
+      .then(() => setCopyState({ recordId, status: 'copied' }))
+      .catch(() => setCopyState({ recordId, status: 'error' }));
+  }
+
   return (
     <div className="flex flex-col gap-3 rounded-8 border border-line-normal bg-background-normal p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{memberName}님 문진 기록</h3>
-        <button type="button" onClick={onClose} className="text-xs text-label-alternative underline">
-          닫기
-        </button>
+        <div className="flex items-center gap-2">
+          {records.length > 0 && (
+            <select
+              value={effectiveRecordId ?? ''}
+              onChange={(e) => setSelectedRecordId(e.target.value)}
+              className="rounded-8 border border-line-normal p-1 text-xs"
+            >
+              {records.map((record) => (
+                <option key={record.id} value={record.id}>
+                  {new Date(record.recordDate).toLocaleDateString('ko-KR')}
+                </option>
+              ))}
+            </select>
+          )}
+          {selectedRecord && (
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="rounded-8 border border-line-normal px-2 py-1 text-xs"
+            >
+              {copyState?.recordId === selectedRecord.id && copyState.status === 'copied' ? '복사됨' : '복사'}
+            </button>
+          )}
+          <button type="button" onClick={onClose} className="text-xs text-label-alternative underline">
+            닫기
+          </button>
+        </div>
       </div>
       {status === 'loading' && <p className="text-sm text-label-alternative">불러오는 중입니다...</p>}
       {status === 'error' && <p className="text-sm text-status-negative">기록을 불러오지 못했습니다.</p>}
       {status === 'ready' && records.length === 0 && (
         <p className="text-sm text-label-alternative">아직 기록이 없습니다.</p>
       )}
-      {status === 'ready' && records.length > 0 && (
-        <div className="overflow-x-auto rounded-8 border border-line-normal bg-background-elevated">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-line-normal">
-                <th className="p-3">일자</th>
-                <th className="p-3">중대성 유무</th>
-                <th className="p-3">특이사항</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((record) => (
-                <tr key={record.id} className="border-b border-line-normal last:border-0">
-                  <td className="p-3">{new Date(record.recordDate).toLocaleDateString('ko-KR')}</td>
-                  <td className="p-3">
-                    {record.isCritical ? (
-                      <span className="font-medium text-status-negative">있음</span>
-                    ) : (
-                      '없음'
-                    )}
-                  </td>
-                  <td className="p-3">{record.notableFindings ?? '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {status === 'ready' && selectedRecord && (
+        <div className="rounded-8 border border-line-normal bg-background-elevated p-3 text-sm">
+          <div className="mb-2 flex items-center gap-3 text-xs text-label-alternative">
+            <span>{new Date(selectedRecord.recordDate).toLocaleDateString('ko-KR')}</span>
+            <span>
+              중대성 유무:{' '}
+              {selectedRecord.isCritical ? (
+                <span className="font-medium text-status-negative">있음</span>
+              ) : (
+                '없음'
+              )}
+            </span>
+          </div>
+          <p className="whitespace-pre-wrap">{selectedRecord.notableFindings ?? '특이사항 없음'}</p>
+          {copyState?.recordId === selectedRecord.id && copyState.status === 'error' && (
+            <p className="mt-2 text-xs text-status-negative">복사에 실패했습니다. 직접 선택해 복사해 주세요.</p>
+          )}
         </div>
       )}
     </div>

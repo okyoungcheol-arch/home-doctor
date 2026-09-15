@@ -279,6 +279,21 @@ state)가 뜨고, 매니저가 "저장"을 눌러야 `handleSaveRecord()`가 `PO
 반환한다(조직 전체를 조인해 반환하던 `listRecordsForOrganization`은 이 기능과 함께 삭제됐다).
 `listRecordsForMember(memberId)`는 §7의 종합 단계가 과거 기록 비교에 쓰는 조회도 겸한다.
 
+`MemberRecordsPanel`(`components/InterviewStartScreen.tsx`)은 여러 기록을 표(table)로 나열하는
+대신, 헤더 줄에 "일자 선택 콤보(`<select>`, 각 기록의 `recordDate`를 항목으로) → 복사 버튼 → 닫기
+버튼" 순서로 배치하고, 콤보에서 고른 기록 하나(기본값은 최신 기록)의 일자/중대성 유무/특이사항만
+본문에 보여준다. 콤보 선택 state는 effect로 초기화하지 않는다 — `selectedRecordId`가 아직
+없거나 현재 목록에 없는 id면 매 렌더에서 `records[0]`(최신)으로 대체해서 파생시킨다(다른 회원의
+기록을 열 때도 새로 마운트되는 컴포넌트라 effect 리셋이 필요 없다).
+
+**복사 기능**: "복사" 버튼은 선택된 기록의 특이사항을 `navigator.clipboard.writeText()`로
+클립보드에 복사한다 — 매니저가 이 텍스트를 복사해 보호자 등에게 문자로 전달하는 용도이며, 문자
+발송 자체(수신자 선택, 전송)는 이 앱이 하지 않고 매니저가 클립보드 내용을 자신의 문자 앱에 붙여넣어
+직접 보낸다. 복사 텍스트 형식은 `[{회원명}] {YYYY.MM.DD} 문진 특이사항\n{특이사항 또는 '특이사항
+없음'}`. 복사 성공/실패 상태(`copyState`)는 어느 기록에 대한 결과인지(`recordId`)까지 함께
+저장해, 복사 후 다른 일자로 바꿔도 "복사됨" 표시가 잘못 남지 않게 한다. `navigator.clipboard`가
+없는 환경(예: 비-HTTPS)에서는 곧바로 실패로 처리해 "복사에 실패했습니다" 안내를 보여준다.
+
 `getPatientProfile()`(`lib/server/auth/patientProfile.ts`)도 Clerk `unsafeMetadata`가 아니라
 세션에서 값을 읽는다: 세션이 없으면 `null`, 매니저 세션이지만 `activeMemberId`가 없으면 `null`,
 있으면 `findMemberInOrganization`으로 회원 행을 조회해 `{ ageBand, gender, occupation }`을
