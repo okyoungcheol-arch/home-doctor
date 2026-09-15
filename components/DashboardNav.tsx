@@ -4,11 +4,18 @@ import Link from 'next/link';
 import { MANAGER_PHONE_STORAGE_KEY } from '@/lib/phone';
 
 export function DashboardNav() {
-  function handleSwitchAccount() {
+  async function handleSwitchAccount() {
     try {
       localStorage.removeItem(MANAGER_PHONE_STORAGE_KEY);
     } catch {
       // ignore — 스토리지 접근이 막혀 있어도 이동 자체는 진행한다
+    }
+    try {
+      // 서버 세션 쿠키까지 지워야 한다 — 안 지우면 '/'로 이동해도 매니저 세션이 남아 있어
+      // 같은 계정의 /dashboard로 곧바로 되돌아간다.
+      await fetch('/api/logout', { method: 'POST' });
+    } catch {
+      // ignore — 로그아웃 요청이 실패해도 이동 자체는 진행한다
     }
     window.location.href = '/';
   }

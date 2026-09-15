@@ -134,6 +134,15 @@ export async function readSession(): Promise<SessionPayload | null> {
 }
 
 /**
+ * 세션 쿠키 자체를 삭제한다("다른 계정으로 로그인"처럼 현재 로그인을 완전히 종료할 때 사용).
+ * `clearActiveMember`와 달리 매니저/관리자 신원까지 전부 지운다.
+ */
+export async function clearSession(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(SESSION_COOKIE_NAME);
+}
+
+/**
  * 매니저가 특정 회원을 선택했을 때 세션에 활성 회원을 기록한다. 유효한 매니저 세션이
  * 없으면(세션이 없거나 admin 세션이면) 예외를 던진다(호출 전에 라우트 핸들러가 매니저 인증을
  * 확인했어야 한다).

@@ -166,7 +166,12 @@
   호출해 즉시 `/dashboard`로 이동한다(실패하면 저장된 번호를 지우고 평소 입력 화면으로 전환) —
   같은 기기를 계속 쓰는 태블릿/키오스크에서 매번 전화번호를 다시 입력하지 않도록 하기 위함이다.
   `/dashboard` 계열 페이지 상단의 "다른 계정으로 로그인" 버튼(`components/DashboardNav.tsx`,
-  `app/dashboard/layout.tsx`가 렌더)이 이 저장된 번호를 지우고 첫 화면으로 돌려보낸다. 전화번호
+  `app/dashboard/layout.tsx`가 렌더)이 이 저장된 번호를 지우고, `POST /api/logout`
+  (`lib/server/auth/session.ts`의 `clearSession()`이 `hd_session` 쿠키 자체를 삭제한다)을 호출해
+  서버 세션까지 완전히 종료한 뒤 첫 화면으로 돌려보낸다 — 세션 쿠키를 지우지 않고 로컬 저장값만
+  지우면 `/`으로 이동해도 매니저 세션이 남아 있어 `app/page.tsx`가 같은 계정의 `/dashboard`로
+  즉시 되돌려보내는 버그가 있었다(현재는 수정됨). `clearSession()`은 `clearActiveMember()`와
+  달리 매니저/관리자 신원까지 포함해 세션 전체를 지운다. 전화번호
   입력 필드들은 `lib/phone.ts`의 `formatPhoneNumber`로
   타이핑 중 `010-1234-5678` 형태로 자동 하이픈 포맷되지만, 서버(리포지토리 계층)는 항상
   `normalizePhoneNumber`로 숫자만 남겨 저장/조회하므로 표시 포맷과 무관하게 기존 데이터와
@@ -220,17 +225,27 @@
 호출자의 단체에 속하는지" 확인이 필요한 모든 곳(이 라우트, `select-member`, `getPatientProfile()`)이
 하나를 공유한다. `memberId`/`organizationId`를 클라이언트가 보내는 값이 아니라 매니저 세션에서
 직접 파생한다 — 손님은 `InterviewApp`의 `canSave` prop이 저장 요청 자체를 막아 이 엔드포인트를
-호출하지 않는다. 저장이 성공하면 이 라우트 자신이 `clearActiveMember()`를 호출해 세션의
-`activeMemberId`를 지운다(클라이언트가 별도로 기억해 호출할 필요가 없다 — "처음으로" 클릭 시
-저장 없이 회원 선택만 취소하는 경우에는 여전히 `InterviewApp`이 `POST /api/dashboard/clear-member`를
-호출한다). 그렇지 않으면 공용 태블릿에서 다음 문진이 이전 회원 명의로 저장되는 사고로 이어진다.
+호출하지 않는다. 종합 소견(§7)이 나오면 자동으로 저장되지 않는다 — `components/InterviewApp.tsx`의
+리포트 화면에 "이 문진 결과를 저장하시겠습니까?" 확인 UI(저장/저장 안 함 버튼, `saveState`
+state)가 뜨고, 매니저가 "저장"을 눌러야 `handleSaveRecord()`가 `POST /api/records`를 호출한다
+("저장 안 함"을 누르면 API 호출 없이 그 문진 결과는 저장되지 않은 채로 남는다 — 이후 "처음으로"를
+누르면 `clear-member` 경로로 활성 회원 선택만 해제된다). 저장이 성공하면 이 라우트 자신이
+`clearActiveMember()`를 호출해 세션의 `activeMemberId`를 지운다(클라이언트가 별도로 기억해 호출할
+필요가 없다 — "처음으로" 클릭 시 저장 없이 회원 선택만 취소하는 경우에는 `InterviewApp`이 `POST
+/api/dashboard/clear-member`를 호출한다). 그렇지 않으면 공용 태블릿에서 다음 문진이 이전 회원
+명의로 저장되는 사고로 이어진다.
 회원 본인 로그인이 없으므로 `GET /api/records`나
-`listRecordsForUser` 같은 개인별 히스토리 조회는 없다. 대신 `lib/server/records/repository.ts`의
-`listRecordsForOrganization`이 `medical_records`를 `members`와 조인해 레코드마다 `memberName`을
-함께 반환하고(회원명 오름차순 → 문진일 내림차순 정렬), `components/InterviewStartScreen.tsx`의
-기록 테이블은 (예전의 전화번호 컬럼 대신) 회원명 컬럼과 (예전의 과거비교 특이사항 컬럼 대신)
-`notableFindings` 기반 특이사항 컬럼을 보여준다. `listRecordsForMember(memberId)`는 §7의 종합
-단계가 과거 기록 비교에 쓰는 별도 조회 함수다.
+`listRecordsForUser` 같은 개인별 히스토리 조회는 없다. `components/InterviewStartScreen.tsx`의
+`/dashboard` 화면은 더 이상 소속단체 전체 기록을 보여주지 않는다 — 회원을 선택하지 않은 채로는
+어떤 회원의 기록도 노출되지 않는다. "회원 선택" 목록에는 이름/전화번호로 필터링하는 검색창이
+있고, 각 회원 행에는 "문진 시작"(기존의 `select-member` → `/` 이동)과는 별개로 "기록 보기"
+버튼이 있어, 누르면 그 회원만의 기록을 `GET /api/dashboard/records?memberId=...`
+(`app/api/dashboard/records/route.ts`)로 조회해 같은 화면에 인라인으로 펼쳐 보여준다("기록
+보기"는 세션의 `activeMemberId`를 바꾸지 않는 순수 조회 동작이다). 이 라우트는
+`findMemberInOrganization`으로 해당 회원이 호출자의 단체 소속인지 먼저 확인한 뒤
+`lib/server/records/repository.ts`의 `listRecordsForMember(memberId)`로 그 회원의 기록만
+반환한다(조직 전체를 조인해 반환하던 `listRecordsForOrganization`은 이 기능과 함께 삭제됐다).
+`listRecordsForMember(memberId)`는 §7의 종합 단계가 과거 기록 비교에 쓰는 조회도 겸한다.
 
 `getPatientProfile()`(`lib/server/auth/patientProfile.ts`)도 Clerk `unsafeMetadata`가 아니라
 세션에서 값을 읽는다: 세션이 없으면 `null`, 매니저 세션이지만 `activeMemberId`가 없으면 `null`,

@@ -52,6 +52,7 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
   const [emergencyFlags, setEmergencyFlags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saveWarning, setSaveWarning] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'skipped'>('idle');
 
   // Bumped by handleReset so any async handler still in flight (fetches can take up to
   // maxDuration = 60s) can tell its own session has been abandoned and skip its setState calls.
@@ -200,8 +201,12 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
     }
   }
 
-  async function saveRecord(finalOpinions: SpecialistOpinion[], finalReport: SynthesisReportType) {
-    if (!canSave) return;
+  // 자동 저장이 아니라 사용자가 "저장" 버튼을 눌러야 호출된다 — 리포트 화면에 남아 있는
+  // `opinions`/`report` state를 그대로 사용한다(문진 종료 시점의 값과 동일).
+  async function handleSaveRecord() {
+    if (!canSave || !report) return;
+    setSaveState('saving');
+    setSaveWarning(null);
     try {
       const response = await fetch('/api/records', {
         method: 'POST',
@@ -209,19 +214,21 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
         body: JSON.stringify({
           documentTexts,
           recordingText,
-          interviewRecord: { qaLog, opinions: finalOpinions, report: finalReport },
-          diagnosisResult: finalReport.overallImpression,
-          precautions: finalReport.recommendedActions.join('; '),
-          notableFindings: finalReport.redFlags.length > 0 ? finalReport.redFlags.join('; ') : null,
-          isCritical: finalReport.redFlags.length > 0,
+          interviewRecord: { qaLog, opinions, report },
+          diagnosisResult: report.overallImpression,
+          precautions: report.recommendedActions.join('; '),
+          notableFindings: report.redFlags.length > 0 ? report.redFlags.join('; ') : null,
+          isCritical: report.redFlags.length > 0,
         }),
       });
       if (!response.ok) throw new Error(await parseErrorMessage(response));
       // POST /api/records itself clears the session's active member on success — no separate
       // client-side call needed here (see app/api/records/route.ts).
+      setSaveState('saved');
     } catch (err) {
       console.error('의료정보 저장 실패', err);
-      setSaveWarning('문진 결과를 저장하지 못했습니다. 화면에 표시된 결과는 그대로 확인하실 수 있습니다.');
+      setSaveState('idle');
+      setSaveWarning('문진 결과를 저장하지 못했습니다. 다시 시도해 주세요.');
     }
   }
 
@@ -238,8 +245,6 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
       if (sessionIdRef.current !== sessionId) return;
       setReport(data.report);
       setStage('report');
-
-      await saveRecord(finalOpinions, data.report);
     } catch (err) {
       if (sessionIdRef.current !== sessionId) return;
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
@@ -262,6 +267,7 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
     setEmergencyFlags([]);
     setError(null);
     setSaveWarning(null);
+    setSaveState('idle');
 
     if (canSave) {
       try {
@@ -323,6 +329,41 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
             ))}
           </div>
           <SynthesisReport report={report} />
+
+          {canSave && (
+            <>
+              {saveState === 'idle' && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-8 border border-line-normal bg-background-elevated p-4">
+                  <p className="text-sm">이 문진 결과를 저장하시겠습니까?</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSaveState('skipped')}
+                      className="rounded-8 border border-line-normal px-3 py-1.5 text-sm"
+                    >
+                      저장 안 함
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveRecord}
+                      className="rounded-8 bg-primary-normal px-3 py-1.5 text-sm font-medium text-static-white"
+                    >
+                      저장
+                    </button>
+                  </div>
+                </div>
+              )}
+              {saveState === 'saving' && (
+                <p className="text-sm text-label-alternative">저장하는 중입니다...</p>
+              )}
+              {saveState === 'saved' && (
+                <p className="text-sm text-status-positive">문진 결과가 저장되었습니다.</p>
+              )}
+              {saveState === 'skipped' && (
+                <p className="text-sm text-label-alternative">이 문진 결과는 저장하지 않았습니다.</p>
+              )}
+            </>
+          )}
         </>
       )}
     </main>
