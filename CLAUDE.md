@@ -55,8 +55,9 @@
   Postgres(`organizations`/`managers`/`members`/`medical_records` 테이블, Drizzle)에 영구
   저장되며, `medical_records`는 `memberId`/`organizationId` FK로 회원·조직에 연결되고
   `documentTexts`(업로드 문서별 추출 텍스트 배열, 최대 2개)·`recordingText`(음성 녹음 전사,
-  nullable)·`interviewRecord`·`notableFindings`(종합 소견의 red flag를 요약한 특이사항, nullable)
-  등을 담는다. 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다 — 단, 회원
+  nullable)·`interviewRecord`·`notableFindings`(종합 소견의 red flag를 요약한 특이사항,
+  nullable)·`severityLevel`(종합 소견이 AI로 직접 판정하는 1~5단계 심각도, nullable — 매니저
+  대시보드 회원 목록의 색상 경고등에 쓰인다) 등을 담는다. 원본 오디오/이미지 파일은 저장하지 않고 AI가 추출한 텍스트만 저장한다 — 단, 회원
   등록 시 받는 개인정보 동의 서명 이미지는 예외로, `members.consentSignatureUrl`에 Vercel
   Blob(`access: 'private'`) URL로 저장된다(`docs/superpowers/specs/2026-09-14-member-consent-signature-design.md`
   참고). 자세한 내용은

@@ -9,6 +9,7 @@ const { generateObjectMock } = vi.hoisted(() => ({
       ],
       recommendedActions: ['호흡기내과 방문 및 폐기능 검사 권장'],
       redFlags: [],
+      severityLevel: 2,
     },
   })),
 }));

@@ -219,6 +219,7 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
           precautions: report.recommendedActions.join('; '),
           notableFindings: report.redFlags.length > 0 ? report.redFlags.join('; ') : null,
           isCritical: report.redFlags.length > 0,
+          severityLevel: report.severityLevel,
         }),
       });
       if (!response.ok) throw new Error(await parseErrorMessage(response));

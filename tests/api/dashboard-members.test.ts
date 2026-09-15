@@ -4,6 +4,7 @@ const requireManagerMock = vi.fn();
 const createMemberMock = vi.fn();
 const listMembersForOrganizationMock = vi.fn();
 const uploadSignatureMock = vi.fn();
+const listLatestSeverityByMemberMock = vi.fn();
 
 vi.mock('@/lib/server/auth/authorize', () => ({
   requireManager: () => requireManagerMock(),
@@ -13,6 +14,10 @@ vi.mock('@/lib/server/auth/authorize', () => ({
 vi.mock('@/lib/server/organizations/repository', () => ({
   createMember: (input: unknown) => createMemberMock(input),
   listMembersForOrganization: (organizationId: string) => listMembersForOrganizationMock(organizationId),
+}));
+
+vi.mock('@/lib/server/records/repository', () => ({
+  listLatestSeverityByMember: (organizationId: string) => listLatestSeverityByMemberMock(organizationId),
 }));
 
 vi.mock('@/lib/server/blob', () => ({
@@ -228,6 +233,8 @@ describe('GET /api/dashboard/members', () => {
   beforeEach(() => {
     requireManagerMock.mockReset();
     listMembersForOrganizationMock.mockReset();
+    listLatestSeverityByMemberMock.mockReset();
+    listLatestSeverityByMemberMock.mockResolvedValue(new Map());
   });
 
   it('returns 403 when the caller is not a manager', async () => {
@@ -235,21 +242,30 @@ describe('GET /api/dashboard/members', () => {
     const response = await GET();
     expect(response.status).toBe(403);
     expect(listMembersForOrganizationMock).not.toHaveBeenCalled();
+    expect(listLatestSeverityByMemberMock).not.toHaveBeenCalled();
   });
 
-  it("scopes results to the manager's own organization", async () => {
+  it("scopes results to the manager's own organization and attaches each member's latest severity", async () => {
     requireManagerMock.mockResolvedValue({
       role: 'manager',
       organizationId: 'org_1',
       managerId: 'manager_1',
     });
-    listMembersForOrganizationMock.mockResolvedValue([{ id: 'member_1', organizationId: 'org_1', name: '홍길동' }]);
+    listMembersForOrganizationMock.mockResolvedValue([
+      { id: 'member_1', organizationId: 'org_1', name: '홍길동' },
+      { id: 'member_2', organizationId: 'org_1', name: '김철수' },
+    ]);
+    listLatestSeverityByMemberMock.mockResolvedValue(new Map([['member_1', 4]]));
 
     const response = await GET();
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.members).toEqual([{ id: 'member_1', organizationId: 'org_1', name: '홍길동' }]);
+    expect(data.members).toEqual([
+      { id: 'member_1', organizationId: 'org_1', name: '홍길동', latestSeverityLevel: 4 },
+      { id: 'member_2', organizationId: 'org_1', name: '김철수', latestSeverityLevel: null },
+    ]);
     expect(listMembersForOrganizationMock).toHaveBeenCalledWith('org_1');
+    expect(listLatestSeverityByMemberMock).toHaveBeenCalledWith('org_1');
   });
 });

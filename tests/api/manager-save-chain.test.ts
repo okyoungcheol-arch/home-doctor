@@ -125,6 +125,7 @@ describe('manager-entry -> select-member -> records save (real session/cookie, D
         precautions: '호흡기내과 방문 권장',
         notableFindings: null,
         isCritical: false,
+        severityLevel: 2,
       }),
     );
     expect(saveResponse.status).toBe(200);

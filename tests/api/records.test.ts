@@ -73,6 +73,7 @@ describe('POST /api/records', () => {
         precautions: '호흡기내과 방문 권장',
         notableFindings: null,
         isCritical: false,
+        severityLevel: 2,
       }),
     );
 
@@ -90,6 +91,7 @@ describe('POST /api/records', () => {
       precautions: '호흡기내과 방문 권장',
       notableFindings: null,
       isCritical: false,
+      severityLevel: 2,
     });
     expect(clearActiveMemberMock).toHaveBeenCalledTimes(1);
   });
@@ -113,6 +115,7 @@ describe('POST /api/records', () => {
         precautions: '호흡기내과 방문 권장',
         notableFindings: null,
         isCritical: false,
+        severityLevel: 2,
       }),
     );
     const data = await response.json();

@@ -14,6 +14,7 @@ const createRecordSchema = z.object({
   precautions: z.string().min(1),
   notableFindings: z.string().nullable(),
   isCritical: z.boolean(),
+  severityLevel: z.number().int().min(1).max(5),
 });
 
 export async function POST(request: Request) {
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
     precautions: parsed.data.precautions,
     notableFindings: parsed.data.notableFindings,
     isCritical: parsed.data.isCritical,
+    severityLevel: parsed.data.severityLevel,
   });
 
   // 문진이 저장됐으니 이 세션의 활성 회원 선택을 서버에서 직접 해제한다 — 클라이언트가 별도

@@ -162,6 +162,7 @@ describe('full intake -> triage -> specialists -> interview -> synthesize chain'
         topDifferentials: [{ condition: '천식', supportingSpecialties: ['호흡기내과'], confidence: 0.7 }],
         recommendedActions: ['호흡기내과 방문 및 폐기능 검사 권장'],
         redFlags: [],
+        severityLevel: 2,
       },
     }));
 

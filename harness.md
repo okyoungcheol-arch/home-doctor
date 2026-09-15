@@ -126,14 +126,22 @@
 - `lib/agents/synthesize.ts`의
   `runSynthesis(opinions: SpecialistOpinion[], pastRecordsSummary?: string | null): Promise<SynthesisReport>`는
   모든 전문의의 최종 소견을 입력받아 `lib/ai/schemas.ts`의 `synthesisReportSchema`(`overallImpression`,
-  `topDifferentials`, `recommendedActions`, `redFlags`)를 만족하는 `SynthesisReport`를 반환한다.
+  `topDifferentials`, `recommendedActions`, `redFlags`, `severityLevel`)를 만족하는 `SynthesisReport`를
+  반환한다. `severityLevel`(1~5 정수, 필수)은 AI가 전체 소견을 종합해 직접 판정하는 심각도 등급이다
+  — 1=경미(경과 관찰), 2=관찰 필요, 3=주의(병원 방문 권장), 4=심각(빠른 진료 필요), 5=응급(즉시
+  119/응급실)이며, `redFlags`가 있으면 최소 4 이상으로 판정하도록 프롬프트에 명시한다. 이 함수는
+  세션당 1회 호출되는 최종 결과물이라 `TEXT_MODEL`(기본값 `anthropic/claude-opus-5`)로 호출하므로,
+  `severityLevel`도 자연히 이 모델로 추론된다 — 별도의 모델 호출을 추가하지 않았다.
 - `app/api/synthesize/route.ts`가 이 함수를 HTTP로 노출한다. 매니저 세션에 활성 회원이 있으면
   `listRecordsForMember`로 해당 회원의 과거 기록 최근 3건을 조회해 날짜/진단/특이사항 요약 문자열을
   만들고, 이를 `pastRecordsSummary`로 `runSynthesis`에 함께 넘긴다(손님, 또는 과거 기록이 없는
   회원은 `null` — 프롬프트에 과거 비교 섹션 자체가 붙지 않는다). 과거 기록이 있으면 모델에게 이번
   소견과 비교해 악화된 부분이 있으면 `overallImpression`에 명시하도록 지시한다. `app/page.tsx`의
   `finishInterview`가 문진 루프 종료(큐 비었음 또는 질문 수 상한 도달) 시 이 라우트를 호출해 결과를
-  `SynthesisReport` 컴포넌트로 렌더링한다.
+  `SynthesisReport` 컴포넌트로 렌더링한다 — 이 컴포넌트는 `lib/severity.ts`의
+  `getSeverityColor`/`getSeverityLabel`로 `severityLevel`을 색점 + 라벨로 함께 보여준다.
+  `severityLevel`은 저장 시(`medical_records.severityLevel`, nullable integer) `POST /api/records`로도
+  전달되며(§ 저장 참고), 매니저 대시보드 회원 목록의 경고등이 이 값을 회원별로 조회해 보여준다.
 
 ## 회원/저장 아키텍처
 
@@ -171,18 +179,36 @@
     `admin.pinCode`가 `null`인 계정은 이 검사를 건너뛰어 기존 동작 그대로다. admin 행을 그대로
     반환하는 다른 API가 없으므로(admin-entry 자신도 `{ success: true }`만 응답) 해시가 클라이언트로
     노출될 경로는 없다.
-  - **소속단체별 회원현황 조회**: `components/AdminPanel.tsx`의 "소속단체별 회원현황" 섹션에서
-    단체를 고르면 `GET /api/admin/members?organizationId=<id>`(`requireAdmin` 가드,
-    `listMembersForOrganization` 재사용)로 그 단체의 회원 목록을 보여주고, 회원을 클릭하면 `GET
-    /api/admin/members/notable-finding?memberId=<id>`가 신규 `findMemberById`(단체 경계 없이
-    id만으로 조회 — admin은 특정 단체에 속하지 않는 전역 역할이라 매니저용
-    `findMemberInOrganization`과 달리 조직 일치 검사가 없다)로 회원 존재를 확인한 뒤
-    `listRecordsForMember`가 이미 문진일 내림차순으로 정렬해 반환하는 배열의 첫 번째 항목(최신
-    문진 1건)에서 `notableFindings`만 뽑아 반환한다. 화면에는 200자를 넘으면 잘라서("...") 보여주고,
-    기록이 아예 없으면 "특이사항 기록이 없습니다."를 표시한다 — 매니저 대시보드처럼 단체
-    경계로 접근을 제한할 필요가 없으므로(admin은 모든 단체를 볼 수 있는 역할) 두 라우트 모두
-    `organizationId`/`memberId`를 querystring으로만 받는다(다른 admin 라우트와 동일하게 이
-    프로젝트는 동적 `[param]` 라우트 세그먼트를 쓰지 않는다).
+  - **관리자 화면 3분할**: `/admin` 계열은 `app/admin/layout.tsx`가 `requireAdmin`이 아니라
+    `getViewer().role !== 'admin'`이면 `/`로 redirect하는 가드를 한 번만 수행하고
+    (`app/dashboard/layout.tsx`와 동일 패턴) `components/admin/AdminNav.tsx`(단체 생성/매니저
+    등록/단체별 조회 링크 + "다른 계정으로 로그인")를 공용으로 렌더한다. 예전에는 이 세 기능이
+    `components/AdminPanel.tsx` 한 파일에 몰려 있었으나, 화면별로 분리했다:
+    - `/admin`(`components/admin/OrganizationForm.tsx`): 단체 생성 폼만.
+    - `/admin/managers`(`components/admin/ManagerForm.tsx`): 매니저 등록 폼 — 단체 선택 드롭다운을
+      위해 `GET /api/admin/organizations`를 이 컴포넌트가 직접 조회한다(다른 두 화면과 상태를
+      공유하지 않는 별도 페이지이므로).
+    - `/admin/status`(`components/admin/AdminStatusScreen.tsx`): 단체별 조회 — 단체를 고르면
+      **회원**과 **매니저** 목록을 구분해서 보여준다. 회원 목록은 `GET
+      /api/admin/members?organizationId=<id>`(`listMembersForOrganization` 재사용), 매니저 목록은
+      신규 `GET /api/admin/managers?organizationId=<id>`(신규 `listManagersForOrganization`)로
+      조회한다. 회원을 클릭하면 `GET /api/admin/members/notable-finding?memberId=<id>`가 신규
+      `findMemberById`(단체 경계 없이 id만으로 조회 — admin은 특정 단체에 속하지 않는 전역 역할이라
+      매니저용 `findMemberInOrganization`과 달리 조직 일치 검사가 없다)로 회원 존재를 확인한 뒤
+      `listRecordsForMember`가 이미 문진일 내림차순으로 정렬해 반환하는 배열의 첫 번째 항목(최신
+      문진 1건)에서 `notableFindings`만 뽑아 반환하고, **팝업**으로 200자를 넘으면 잘라서("...")
+      보여준다(기록이 아예 없으면 "특이사항 기록이 없습니다."). 매니저를 클릭하면 신규 `GET
+      /api/admin/managers/notable-finding?managerId=<id>`가 신규 `findManagerById`로 매니저를
+      조회한 뒤, "매니저도 회원이 될 수 있다"는 요구사항에 따라 신규
+      `findMemberByPhoneInOrganization(manager.phoneNumber, manager.organizationId)`로 같은
+      단체 안에서 전화번호가 일치하는 회원을 찾는다(두 테이블 모두 저장 시 이미
+      `normalizePhoneNumber`로 정규화되어 있어 그대로 비교 가능) — 매칭되면 그 회원의 특이사항을
+      회원 팝업과 동일하게 보여주고, 매칭되지 않으면 `isMember: false`를 반환해 팝업에 "등록된
+      회원이 아닙니다"를 표시한다. `organizationId`는 항상 조회된 매니저 행에서 서버가 직접
+      파생하며 클라이언트가 별도로 보내지 않는다. 매니저 대시보드처럼 단체 경계로 접근을 제한할
+      필요가 없으므로(admin은 모든 단체를 볼 수 있는 역할) 이 절의 모든 라우트가
+      `organizationId`/`memberId`/`managerId`를 querystring으로만 받는다(다른 admin 라우트와
+      동일하게 이 프로젝트는 동적 `[param]` 라우트 세그먼트를 쓰지 않는다).
 - **매니저(manager)**: 관리자와 마찬가지로 Clerk 계정이 없다. `lib/server/db/schema.ts`의 `managers` 테이블
   (`id`/`organizationId` FK/`phoneNumber` unique/`position`/`createdAt`)에 관리자가 등록해둔
   전화번호를 `components/WelcomeScreen.tsx`(첫 화면)에 내장된 입력 폼에 제출하면 `POST
@@ -224,8 +250,9 @@
   반환하므로 `/`로 다시 이동시키면 무한 루프가 되기 때문에 의도적으로 네비게이션을 쓰지 않는다).
   같은 화면의 매니저 전화번호 입력 폼과는 완전히 분리된 별도 버튼이다.
 - `proxy.ts` 미들웨어는 더 이상 존재하지 않는다(삭제됨) — 앱 전체에 미들웨어 기반 라우트 보호가
-  없다. admin 라우트(`app/admin/page.tsx`, `app/api/admin/organizations/route.ts`,
-  `app/api/admin/managers/route.ts`, `app/api/admin/members/route.ts`,
+  없다. admin 라우트(`app/admin/page.tsx`, `app/admin/managers/page.tsx`, `app/admin/status/page.tsx`,
+  `app/api/admin/organizations/route.ts`, `app/api/admin/managers/route.ts`,
+  `app/api/admin/managers/notable-finding/route.ts`, `app/api/admin/members/route.ts`,
   `app/api/admin/members/notable-finding/route.ts`)를 포함해 대시보드, 기록 저장, AI 문진 파이프라인
   (`/api/triage`, `/api/specialists`, `/api/interview`, `/api/synthesize`, `/api/intake`) 등
   모든 라우트가 각자의 핸들러 내부에서 `requireAdmin()`/`getViewer()` 등으로 자체적으로 인가를
@@ -249,7 +276,9 @@
 한 번도 채워지지 않았던 `historicalComparisonNote`를 대체). `diagnosisResult`/`precautions`는
 종합 소견의 `overallImpression`/`recommendedActions`를 각각 그대로/세미콜론으로 이어붙여 채우고,
 `memberName`/`memberPhoneNumber`는 저장 시점 `members` 행 값의 스냅샷이다(이후 회원 정보가
-바뀌어도 과거 레코드의 표시값은 바뀌지 않는다). `POST /api/records`(`app/api/records/route.ts`)는
+바뀌어도 과거 레코드의 표시값은 바뀌지 않는다). `severityLevel`(nullable integer)은 종합 소견의
+동명 필드를 그대로 저장한다 — 이 컬럼이 생기기 전에 저장된 기존 기록은 `null`이다.
+`POST /api/records`(`app/api/records/route.ts`)는
 `requireMember()`로 보호되어 실패 시 401 `저장 권한이 없습니다.`를 반환하고, `activeMemberId`로
 `lib/server/organizations/repository.ts`의 `findMemberInOrganization(id, organizationId)`을
 조회해 회원이 이미 삭제됐거나(세션의 stale `memberId`를 그대로 믿지 않음) 다른 단체 소속이면
@@ -278,6 +307,19 @@ state)가 뜨고, 매니저가 "저장"을 눌러야 `handleSaveRecord()`가 `PO
 `lib/server/records/repository.ts`의 `listRecordsForMember(memberId)`로 그 회원의 기록만
 반환한다(조직 전체를 조인해 반환하던 `listRecordsForOrganization`은 이 기능과 함께 삭제됐다).
 `listRecordsForMember(memberId)`는 §7의 종합 단계가 과거 기록 비교에 쓰는 조회도 겸한다.
+
+**경고등**: "회원 선택" 목록의 "기록 보기" 버튼 뒤에는 그 회원의 가장 최근 문진 `severityLevel`을
+색점으로 보여주는 `SeverityIndicator`가 붙는다(`components/InterviewStartScreen.tsx`,
+`lib/severity.ts`의 `getSeverityColor`/`getSeverityLabel` 공유 — §7의 `SynthesisReport`와 색상이
+어긋나지 않도록 색/라벨을 한 곳에서 관리한다). 이 값은 `GET /api/dashboard/members`
+(`app/api/dashboard/members/route.ts`)가 `listMembersForOrganization`과
+`lib/server/records/repository.ts`의 `listLatestSeverityByMember(organizationId)`를 함께 호출해
+각 회원에 `latestSeverityLevel`로 붙여 응답한다. `listLatestSeverityByMember`는 조직 전체
+`medical_records`에서 `memberId`/`severityLevel` 두 컬럼만 조회해(다른 특이사항 텍스트는 절대
+포함하지 않음) 회원별 가장 최근 값만 골라 `Map`으로 반환한다 — 회원을 선택하지 않고도 노출되는
+정보를 "1~5 등급 숫자 하나"로 엄격히 제한해, 앞서 삭제한 소속단체 전체 기록 노출과 같은 문제로
+되돌아가지 않도록 한다. 기록이 없거나(신규 회원) 이 컬럼이 생기기 전에 저장된 기존 기록만 있으면
+회색("미평가")으로 표시한다.
 
 `MemberRecordsPanel`(`components/InterviewStartScreen.tsx`)은 여러 기록을 표(table)로 나열하는
 대신, 헤더 줄에 "일자 선택 콤보(`<select>`, 각 기록의 `recordDate`를 항목으로) → 복사 버튼 → 닫기

@@ -56,6 +56,7 @@ describe('medicalRecords schema', () => {
       'precautions',
       'notableFindings',
       'isCritical',
+      'severityLevel',
       'createdAt',
     ]);
   });

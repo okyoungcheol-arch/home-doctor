@@ -4,8 +4,23 @@ import { useEffect, useMemo, useState, type DependencyList } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Member, MedicalRecord } from '@/lib/server/db/schema';
 import { normalizePhoneNumber } from '@/lib/phone';
+import { getSeverityColor, getSeverityLabel } from '@/lib/severity';
 
 type DisplayRecord = Pick<MedicalRecord, 'id' | 'recordDate' | 'isCritical' | 'notableFindings'>;
+type MemberWithSeverity = Member & { latestSeverityLevel: number | null };
+
+function SeverityIndicator({ level }: { level: number | null }) {
+  const label = `심각도: ${getSeverityLabel(level)}`;
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+      style={{ backgroundColor: getSeverityColor(level) }}
+    />
+  );
+}
 type FetchStatus = 'loading' | 'ready' | 'error';
 
 /**
@@ -138,7 +153,7 @@ function MemberRecordsPanel({
 
 function MemberSelectionList() {
   const router = useRouter();
-  const { data, status } = useJsonFetch<{ members: Member[] }>('/api/dashboard/members', []);
+  const { data, status } = useJsonFetch<{ members: MemberWithSeverity[] }>('/api/dashboard/members', []);
   const members = useMemo(() => data?.members ?? [], [data]);
   const [selectError, setSelectError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -213,6 +228,7 @@ function MemberSelectionList() {
                   >
                     {viewingRecordsFor === member.id ? '기록 닫기' : '기록 보기'}
                   </button>
+                  <SeverityIndicator level={member.latestSeverityLevel} />
                 </div>
               </div>
               {viewingRecordsFor === member.id && (

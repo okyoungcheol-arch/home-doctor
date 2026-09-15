@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireManager } from '@/lib/server/auth/authorize';
 import { createMember, listMembersForOrganization } from '@/lib/server/organizations/repository';
+import { listLatestSeverityByMember } from '@/lib/server/records/repository';
 import { uploadSignature } from '@/lib/server/blob';
 import { AGE_BANDS, GENDER_VALUES, OCCUPATIONS } from '@/lib/profile/constants';
 import { guard, parseJsonBody } from '@/lib/server/http';
@@ -64,6 +65,15 @@ export async function GET() {
   const guarded = await guard(requireManager, '매니저 권한이 필요합니다.', 403);
   if (!guarded.ok) return guarded.response;
 
-  const members = await listMembersForOrganization(guarded.value.organizationId!);
-  return NextResponse.json({ members });
+  const organizationId = guarded.value.organizationId!;
+  const [members, severityByMember] = await Promise.all([
+    listMembersForOrganization(organizationId),
+    listLatestSeverityByMember(organizationId),
+  ]);
+  const membersWithSeverity = members.map((member) => ({
+    ...member,
+    latestSeverityLevel: severityByMember.get(member.id) ?? null,
+  }));
+
+  return NextResponse.json({ members: membersWithSeverity });
 }

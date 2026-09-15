@@ -6,6 +6,7 @@ const runSynthesisMock = vi.fn(
     topDifferentials: [],
     recommendedActions: ['경과 관찰'],
     redFlags: [],
+    severityLevel: 1,
   }),
 );
 

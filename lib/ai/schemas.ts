@@ -50,5 +50,15 @@ export const synthesisReportSchema = z.object({
     .max(5),
   recommendedActions: z.array(z.string()).min(1),
   redFlags: z.array(z.string()),
+  severityLevel: z
+    .number()
+    .int()
+    .min(1)
+    .max(5)
+    .describe(
+      '전체 소견을 종합한 심각도 등급. 1=경미(경과 관찰), 2=관찰 필요(가벼운 주의), ' +
+        '3=주의(가까운 시일 내 병원 방문 권장), 4=심각(빠른 시일 내 진료 필요), ' +
+        '5=응급(즉시 119 또는 응급실). redFlags가 있으면 최소 4 이상으로 판정할 것',
+    ),
 });
 export type SynthesisReport = z.infer<typeof synthesisReportSchema>;

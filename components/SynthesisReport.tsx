@@ -1,9 +1,19 @@
 import type { SynthesisReport as SynthesisReportType } from '@/lib/ai/schemas';
+import { getSeverityColor, getSeverityLabel } from '@/lib/severity';
 
 export function SynthesisReport({ report }: { report: SynthesisReportType }) {
   return (
     <div className="rounded-16 border-2 border-primary-normal bg-accent-blue-bg p-6 shadow-md">
-      <h2 className="text-lg font-semibold">종합 소견</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">종합 소견</h2>
+        <span className="flex items-center gap-1.5 text-xs font-medium">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: getSeverityColor(report.severityLevel) }}
+          />
+          {getSeverityLabel(report.severityLevel)}
+        </span>
+      </div>
       <p className="mt-2 text-sm">{report.overallImpression}</p>
 
       {report.redFlags.length > 0 && (

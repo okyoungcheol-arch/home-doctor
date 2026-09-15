@@ -60,8 +60,30 @@ describe('synthesisReportSchema', () => {
       ],
       recommendedActions: ['호흡기내과 방문 권장'],
       redFlags: [],
+      severityLevel: 2,
     });
     expect(result.success).toBe(true);
+  });
+
+  it('rejects a severityLevel outside the 1-5 range', () => {
+    const result = synthesisReportSchema.safeParse({
+      overallImpression: '요약',
+      topDifferentials: [],
+      recommendedActions: ['경과 관찰'],
+      redFlags: [],
+      severityLevel: 6,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a missing severityLevel', () => {
+    const result = synthesisReportSchema.safeParse({
+      overallImpression: '요약',
+      topDifferentials: [],
+      recommendedActions: ['경과 관찰'],
+      redFlags: [],
+    });
+    expect(result.success).toBe(false);
   });
 
   it('rejects an empty recommendedActions array', () => {
@@ -70,6 +92,7 @@ describe('synthesisReportSchema', () => {
       topDifferentials: [],
       recommendedActions: [],
       redFlags: [],
+      severityLevel: 1,
     });
     expect(result.success).toBe(false);
   });

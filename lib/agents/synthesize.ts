@@ -23,7 +23,7 @@ export async function runSynthesis(
   const { object } = await generateObject({
     model: TEXT_MODEL,
     instructions:
-      '당신은 여러 전문의의 소견을 취합해 종합 소견을 작성하는 코디네이터입니다. 특정 진단을 단정하지 말고 가능성이 높은 순서로 정리하며, 응급 신호가 있다면 반드시 redFlags에 포함하세요.',
+      '당신은 여러 전문의의 소견을 취합해 종합 소견을 작성하는 코디네이터입니다. 특정 진단을 단정하지 말고 가능성이 높은 순서로 정리하며, 응급 신호가 있다면 반드시 redFlags에 포함하세요. severityLevel(1~5)은 신중하게 판정하세요 — 과소평가는 실제 위험을 놓칠 수 있고 과대평가는 불필요한 불안을 줄 수 있습니다.',
     schema: synthesisReportSchema,
     prompt: `다음은 각 전문의의 소견입니다:\n\n${opinionsSummary}${historySection}`,
   });

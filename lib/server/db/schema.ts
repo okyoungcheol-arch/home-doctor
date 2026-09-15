@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, jsonb, boolean, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, jsonb, boolean, integer, index } from 'drizzle-orm/pg-core';
 
 export const organizations = pgTable('organizations', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -51,6 +51,9 @@ export const medicalRecords = pgTable('medical_records', {
   precautions: text('precautions').notNull(), // 종합 소견 recommendedActions를 합친 주의사항 텍스트
   notableFindings: text('notable_findings'), // 종합 소견 redFlags/overallImpression 요약 ("특이사항")
   isCritical: boolean('is_critical').notNull().default(false),
+  // nullable — 이 컬럼이 생기기 전에 저장된 기존 기록은 값이 없다(대시보드에서 회색/미평가로
+  // 표시). 종합 소견 생성 시 AI가 직접 1(경미)~5(응급) 사이로 판정해 채운다.
+  severityLevel: integer('severity_level'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index('medical_records_org_date_idx').on(table.organizationId, table.recordDate),
