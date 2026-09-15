@@ -82,8 +82,13 @@
 - `app/api/specialists/route.ts`가 트리아지가 선택한 각 `specialtyId`에 대해 이 함수를
   `Promise.all`로 병렬 호출하고, 결과 배열을 `{ opinions: SpecialistOpinion[] }`로 반환한다.
 - 반환 타입 `SpecialistOpinion`은 `lib/ai/schemas.ts`의 `specialistFindingsSchema`가 검증하는
-  `SpecialistFindings`(`suspectedConditions`, `followUpQuestions`)에 `specialtyId`/`specialtyName`을
-  덧붙인 것이다.
+  `SpecialistFindings`(`suspectedConditions`, `followUpQuestions`, 선택 필드 `precautions`)에
+  `specialtyId`/`specialtyName`을 덧붙인 것이다. `precautions`는 음식/생활습관 주의사항이나 추가로
+  확인이 필요한 의학적 소견을 짧은 문구 1~3개로 담는 선택 필드로, 해당 사항이 없으면 모델이
+  생략할 수 있다 — `components/SpecialistCard.tsx`가 값이 있을 때만 별도 목록으로 렌더링한다.
+  전문분야 카탈로그(`lib/agents/specialties.ts`의 `SPECIALTY_CATALOG`, 자세한 내용은 agent.md)에는
+  기존 10개 전문분야에 이어 `한의학`(`oriental-medicine`)이 추가되어 총 11개다 — 이 전문분야의
+  `systemPrompt`는 다른 전문분야보다 `precautions`를 적극적으로 채우도록 별도로 지시한다.
 
 ### 5. 문진 질문 병합 — 구현됨
 

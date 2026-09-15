@@ -22,7 +22,7 @@ export function getSpecialtyById(id: string): Specialty | undefined;
 
 ## 카탈로그 전체 목록 (id → 한국어 명칭)
 
-`lib/agents/specialties.ts`를 직접 읽어 확인한 현재 카탈로그 10개 항목:
+`lib/agents/specialties.ts`를 직접 읽어 확인한 현재 카탈로그 11개 항목:
 
 | id | name |
 |---|---|
@@ -36,6 +36,7 @@ export function getSpecialtyById(id: string): Specialty | undefined;
 | `dermatology` | 피부과 |
 | `orthopedics` | 정형외과 |
 | `urology` | 비뇨의학과 |
+| `oriental-medicine` | 한의학 |
 
 ## 트리아지가 카탈로그에서 동적으로 선택하는 방식
 
@@ -72,6 +73,7 @@ export const triageResultSchema = z.object({
 export const specialistFindingsSchema = z.object({
   suspectedConditions: z.array(suspectedConditionSchema).min(1).max(5), // { name, confidence(0~1), rationale }
   followUpQuestions: z.array(followUpQuestionSchema).max(5),            // { question, options(2~5개), reason }
+  precautions: z.array(z.string()).max(3).optional(),                   // 음식·생활습관 주의사항 등, 짧은 문구 1~3개(선택)
 });
 export type SpecialistFindings = z.infer<typeof specialistFindingsSchema>;
 
@@ -80,6 +82,13 @@ export type SpecialistOpinion = SpecialistFindings & {
   specialtyName: string;
 };
 ```
+
+`precautions`는 선택 필드다 — 프롬프트가 음식/생활습관 관련 주의사항이나 추가로 확인이 필요한
+의학적 소견을 짧게(1~3개) 요청하지만, 해당 사항이 없으면 모델이 생략할 수 있다. 기존
+`suspectedConditions`/`followUpQuestions`와 달리 모든 전문분야에 공통으로 적용되는 하나의 스키마
+필드이며, `한의학`(`oriental-medicine`)처럼 식이/생활습관 조언이 특히 중요한 전문분야는
+`systemPrompt`에서 이 필드를 적극적으로 채우도록 별도로 지시한다. `components/SpecialistCard.tsx`가
+값이 있을 때만 별도 목록으로 렌더링한다.
 
 `followUpQuestionSchema`의 `question`/`options`/`reason` 각 필드 `.describe()`에는 "맞춤법에 맞게 작성"
 지침이 포함되어 있다 — 모델이 생성하는 문진 질문/선택지에서 간헐적으로 발생하는 한글 맞춤법 오류(예:

@@ -20,6 +20,10 @@ describe('getSpecialtyById', () => {
     expect(getSpecialtyById('pulmonology')?.name).toBe('호흡기내과');
   });
 
+  it('includes 한의학 in the catalog', () => {
+    expect(getSpecialtyById('oriental-medicine')?.name).toBe('한의학');
+  });
+
   it('returns undefined for an unknown id', () => {
     expect(getSpecialtyById('not-a-real-specialty')).toBeUndefined();
   });

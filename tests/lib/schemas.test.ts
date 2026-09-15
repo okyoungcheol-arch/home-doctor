@@ -18,6 +18,30 @@ describe('specialistFindingsSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts precautions when provided, and omitting it is still valid', () => {
+    const withPrecautions = specialistFindingsSchema.safeParse({
+      suspectedConditions: [{ name: '천식', confidence: 0.6, rationale: '마른기침과 야간 악화' }],
+      followUpQuestions: [],
+      precautions: ['찬 음식과 자극적인 음식은 피하는 것이 좋습니다.'],
+    });
+    expect(withPrecautions.success).toBe(true);
+
+    const withoutPrecautions = specialistFindingsSchema.safeParse({
+      suspectedConditions: [{ name: '천식', confidence: 0.6, rationale: '마른기침과 야간 악화' }],
+      followUpQuestions: [],
+    });
+    expect(withoutPrecautions.success).toBe(true);
+  });
+
+  it('rejects more than 3 precautions', () => {
+    const result = specialistFindingsSchema.safeParse({
+      suspectedConditions: [{ name: '천식', confidence: 0.6, rationale: '테스트' }],
+      followUpQuestions: [],
+      precautions: ['1', '2', '3', '4'],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('rejects confidence outside the 0-1 range', () => {
     const result = specialistFindingsSchema.safeParse({
       suspectedConditions: [{ name: '천식', confidence: 1.5, rationale: '테스트' }],

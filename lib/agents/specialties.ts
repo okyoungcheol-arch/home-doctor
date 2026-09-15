@@ -78,6 +78,13 @@ export const SPECIALTY_CATALOG: Specialty[] = [
       '당신은 비뇨의학과 전문의입니다. 배뇨 이상, 옆구리 통증, 생식기 증상 등 비뇨생식기 문제를 중심으로 분석합니다.' +
       SAFETY_SUFFIX,
   },
+  {
+    id: 'oriental-medicine',
+    name: '한의학',
+    systemPrompt:
+      '당신은 한의학 전문의(한의사)입니다. 기혈 순환, 체질, 소화 기능, 스트레스 등 신체 전반의 균형이라는 한의학적 관점에서 증상을 분석하며, precautions에는 특히 증상에 도움이 되거나 피해야 할 음식·생활습관을 적극적으로 포함합니다.' +
+      SAFETY_SUFFIX,
+  },
 ];
 
 export function getSpecialtyById(id: string): Specialty | undefined {

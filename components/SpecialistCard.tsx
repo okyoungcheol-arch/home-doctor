@@ -13,6 +13,15 @@ export function SpecialistCard({ opinion }: { opinion: SpecialistOpinion }) {
           </li>
         ))}
       </ul>
+      {opinion.precautions && opinion.precautions.length > 0 && (
+        <ul className="mt-3 space-y-1 border-t border-line-normal pt-2">
+          {opinion.precautions.map((precaution) => (
+            <li key={precaution} className="text-sm text-label-neutral">
+              · {precaution}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

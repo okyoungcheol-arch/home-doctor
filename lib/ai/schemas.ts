@@ -21,6 +21,13 @@ export const followUpQuestionSchema = z.object({
 export const specialistFindingsSchema = z.object({
   suspectedConditions: z.array(suspectedConditionSchema).min(1).max(5),
   followUpQuestions: z.array(followUpQuestionSchema).max(5),
+  precautions: z
+    .array(z.string())
+    .max(3)
+    .optional()
+    .describe(
+      '음식·생활습관 관련 주의사항이나 추가로 확인이 필요한 의학적 소견을 짧은 문구 1~3개로 간략히. 해당 사항이 없으면 생략 가능',
+    ),
 });
 export type SpecialistFindings = z.infer<typeof specialistFindingsSchema>;
 
