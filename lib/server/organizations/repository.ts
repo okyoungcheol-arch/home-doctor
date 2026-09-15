@@ -100,3 +100,37 @@ export async function findMemberById(id: string): Promise<Member | null> {
   const [row] = await db.select().from(members).where(eq(members.id, id));
   return row ?? null;
 }
+
+/**
+ * 같은 단체 안에서 전화번호로 회원을 찾는다 — "매니저도 회원일 수 있다"는 요구사항 때문에,
+ * 관리자 화면의 매니저 목록에서 특정 매니저를 클릭했을 때 그 사람이 같은 단체의 회원으로도
+ * 등록돼 있는지(전화번호 일치) 확인하는 용도로 쓰인다. 두 테이블 모두 저장 시 이미
+ * `normalizePhoneNumber`로 숫자만 남기므로, 여기서는 이미 정규화된 `phoneNumber`를 그대로
+ * 비교한다(직접 사용자가 입력한 원본 문자열을 넘길 곳이 아님).
+ */
+export async function findMemberByPhoneInOrganization(
+  phoneNumber: string,
+  organizationId: string,
+): Promise<Member | null> {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(members)
+    .where(and(eq(members.phoneNumber, phoneNumber), eq(members.organizationId, organizationId)));
+  return row ?? null;
+}
+
+export async function findManagerById(id: string): Promise<Manager | null> {
+  const db = getDb();
+  const [row] = await db.select().from(managers).where(eq(managers.id, id));
+  return row ?? null;
+}
+
+export async function listManagersForOrganization(organizationId: string): Promise<Manager[]> {
+  const db = getDb();
+  return db
+    .select()
+    .from(managers)
+    .where(eq(managers.organizationId, organizationId))
+    .orderBy(asc(managers.position));
+}

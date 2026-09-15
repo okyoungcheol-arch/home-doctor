@@ -1,11 +1,5 @@
-import { redirect } from 'next/navigation';
-import { AdminPanel } from '@/components/AdminPanel';
-import { getViewer } from '@/lib/server/auth/authorize';
+import { OrganizationForm } from '@/components/admin/OrganizationForm';
 
-export default async function AdminPage() {
-  const viewer = await getViewer();
-  if (viewer.role !== 'admin') {
-    redirect('/');
-  }
-  return <AdminPanel />;
+export default function AdminPage() {
+  return <OrganizationForm />;
 }
