@@ -14,6 +14,8 @@ type PhoneEntryFormProps = {
 export function PhoneEntryForm({ title, description, apiPath, redirectPath }: PhoneEntryFormProps) {
   const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState('');
+  // 대부분의 관리자 계정에는 PIN이 없다 — 비워두면 서버가 무시하고 전화번호만으로 로그인시킨다.
+  const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,7 +27,7 @@ export function PhoneEntryForm({ title, description, apiPath, redirectPath }: Ph
       const response = await fetch(apiPath, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber }),
+        body: JSON.stringify({ phoneNumber, pin: pin || undefined }),
       });
 
       if (response.ok) {
@@ -33,9 +35,9 @@ export function PhoneEntryForm({ title, description, apiPath, redirectPath }: Ph
         return;
       }
 
-      if (response.status === 404) {
+      if (response.status === 404 || response.status === 401) {
         const data = await response.json();
-        setError(data.error ?? '등록되지 않은 전화번호입니다.');
+        setError(data.error ?? '입장에 실패했습니다.');
       } else {
         setError('입장에 실패했습니다.');
       }
@@ -62,6 +64,17 @@ export function PhoneEntryForm({ title, description, apiPath, redirectPath }: Ph
             onChange={(e) => setPhoneNumber(formatPhoneNumber(e.target.value))}
             placeholder="010-1234-5678"
             required
+            className="rounded-8 border border-line-normal p-2 text-sm"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          PIN (설정된 경우에만 입력)
+          <input
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="선택 입력"
             className="rounded-8 border border-line-normal p-2 text-sm"
           />
         </label>

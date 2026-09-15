@@ -41,8 +41,13 @@
   전화번호를 입력하는 것만으로 입장한다
   (`components/WelcomeScreen.tsx`에 내장된 입력 폼 → `POST /api/manager-entry` → `managers` 테이블 조회 성공 시
   `lib/server/auth/session.ts`의 `createManagerSession`이 서명된 HttpOnly 쿠키(`hd_session`, `jose`
-  JWT, 30일 만료)를 발급 — 관리자·매니저 모두 비밀번호/PIN/OTP 없음, 개인/학습용 프로토타입
-  전제의 낮은 보안 수준으로 의도된 것). 회원은 매니저가 이름·전화번호·성별·연령대·직업을 모두 입력해 등록해두는 대상이며
+  JWT, 30일 만료)를 발급 — 매니저는 비밀번호/PIN/OTP 없음, 개인/학습용 프로토타입 전제의 낮은
+  보안 수준으로 의도된 것. 관리자도 기본은 전화번호만으로 입장하는 동일한 저보안 방식이지만,
+  계정별로 선택적 PIN을 추가할 수 있다 — `admins.pinCode`가 설정된 계정만 `POST
+  /api/admin-entry`가 `pin` 필드까지 함께 검증한다(`lib/server/admins/pin.ts`의 `verifyPin`,
+  `scryptSync` 해시 비교). PIN은 `npm run set-admin-pin -- <전화번호> <PIN>` 스크립트로만
+  설정하며(`lib/server/admins/repository.ts`의 `setAdminPinByPhoneNumber`가 평문이 아니라 해시를
+  저장), PIN이 없는 관리자는 기존과 동일하게 전화번호만으로 로그인한다. 회원은 매니저가 이름·전화번호·성별·연령대·직업을 모두 입력해 등록해두는 대상이며
   (`members` 테이블), 매니저가 `/dashboard`에서 회원을 선택하면 세션에 `activeMemberId`가 추가되어
   그 회원 명의로 문진이 진행된다 — 연령대/성별/직업은 트리아지·전문의 1차 분석 프롬프트에도
   전달된다(이름·전화번호는 전달하지 않음). 손님은 세션 없이 즉시 문진을 시작할 수 있지만 결과는

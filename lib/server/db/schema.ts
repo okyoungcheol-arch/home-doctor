@@ -10,6 +10,10 @@ export const admins = pgTable('admins', {
   id: uuid('id').primaryKey().defaultRandom(),
   phoneNumber: text('phone_number').notNull().unique(),
   name: text('name').notNull(),
+  // nullable — 대부분의 관리자는 여전히 전화번호만으로 로그인한다(의도된 저보안 기본값). PIN을
+  // 설정한 계정만 로그인 시 추가로 검증된다. `scripts/set-admin-pin.ts`가 평문이 아니라
+  // `lib/server/admins/pin.ts`의 `hashPin()` 결과("salt:hash" 형태)를 저장한다.
+  pinCode: text('pin_code'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

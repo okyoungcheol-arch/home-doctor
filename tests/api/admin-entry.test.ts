@@ -3,9 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const findAdminByPhoneNumberMock = vi.fn();
 const createAdminSessionMock = vi.fn();
 const checkRateLimitMock = vi.fn();
+const verifyPinMock = vi.fn();
 
 vi.mock('@/lib/server/admins/repository', () => ({
   findAdminByPhoneNumber: (phoneNumber: string) => findAdminByPhoneNumberMock(phoneNumber),
+}));
+
+vi.mock('@/lib/server/admins/pin', () => ({
+  verifyPin: (pin: string, stored: string) => verifyPinMock(pin, stored),
 }));
 
 vi.mock('@/lib/server/auth/session', () => ({
@@ -31,6 +36,7 @@ describe('POST /api/admin-entry', () => {
     createAdminSessionMock.mockReset();
     checkRateLimitMock.mockReset();
     checkRateLimitMock.mockReturnValue(true);
+    verifyPinMock.mockReset();
   });
 
   it('returns 429 and skips lookup when the rate limit is exceeded', async () => {
@@ -54,6 +60,61 @@ describe('POST /api/admin-entry', () => {
     });
 
     const response = await POST(jsonRequest({ phoneNumber: '010-1234-5678' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ success: true });
+    expect(createAdminSessionMock).toHaveBeenCalledWith('admin_1');
+  });
+
+  it('rejects login with 401 when the account has a PIN and none was submitted', async () => {
+    findAdminByPhoneNumberMock.mockResolvedValue({
+      id: 'admin_1',
+      phoneNumber: '010-4917-2548',
+      name: '홍길동',
+      pinCode: 'salt:hash',
+      createdAt: new Date(),
+    });
+
+    const response = await POST(jsonRequest({ phoneNumber: '010-4917-2548' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data).toEqual({ error: 'PIN이 올바르지 않습니다.' });
+    expect(verifyPinMock).not.toHaveBeenCalled();
+    expect(createAdminSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects login with 401 when the submitted PIN does not match', async () => {
+    findAdminByPhoneNumberMock.mockResolvedValue({
+      id: 'admin_1',
+      phoneNumber: '010-4917-2548',
+      name: '홍길동',
+      pinCode: 'salt:hash',
+      createdAt: new Date(),
+    });
+    verifyPinMock.mockReturnValue(false);
+
+    const response = await POST(jsonRequest({ phoneNumber: '010-4917-2548', pin: '0000' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data).toEqual({ error: 'PIN이 올바르지 않습니다.' });
+    expect(verifyPinMock).toHaveBeenCalledWith('0000', 'salt:hash');
+    expect(createAdminSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('creates a session when the submitted PIN matches', async () => {
+    findAdminByPhoneNumberMock.mockResolvedValue({
+      id: 'admin_1',
+      phoneNumber: '010-4917-2548',
+      name: '홍길동',
+      pinCode: 'salt:hash',
+      createdAt: new Date(),
+    });
+    verifyPinMock.mockReturnValue(true);
+
+    const response = await POST(jsonRequest({ phoneNumber: '010-4917-2548', pin: '7007' }));
     const data = await response.json();
 
     expect(response.status).toBe(200);

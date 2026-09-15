@@ -64,6 +64,6 @@ describe('medicalRecords schema', () => {
 describe('admins schema', () => {
   it('defines the expected columns', () => {
     const columns = Object.keys(getTableColumns(admins));
-    expect(columns).toEqual(['id', 'phoneNumber', 'name', 'createdAt']);
+    expect(columns).toEqual(['id', 'phoneNumber', 'name', 'pinCode', 'createdAt']);
   });
 });

@@ -140,18 +140,32 @@
 필드가 없다).
 
 - **관리자(admin)**: Clerk 계정도 비밀번호도 없다. `lib/server/db/schema.ts`의 `admins` 테이블
-  (`id`/`phoneNumber` unique/`name`/`createdAt` — `organizationId`가 없다, 조직에 속하지 않는
-  전역 역할이기 때문이다)에 등록된 관리자 전화번호를 보관하며, 이 테이블은 로컬 스크립트
-  `npm run seed:admin -- <전화번호> <이름>`(`scripts/seed-admin.ts`, `lib/server/admins/repository.ts`의
-  `createAdmin`을 직접 호출한다)으로만 부트스트랩된다 — admin 행을 만드는 공개 HTTP 라우트는
-  없다. 관리자가 `app/admin-entry/page.tsx`에서 전화번호를 제출하면 `POST /api/admin-entry`가
-  `findAdminByPhoneNumber`로 조회하고, 일치하면 `lib/server/auth/session.ts`의
-  `createAdminSession(adminId)`이 매니저와 동일한 `hd_session` 쿠키 포맷을 발급한다(다만
-  `role: 'manager'`/`managerId`/`organizationId` 대신 `role: 'admin'`과 `adminId`를 담는다).
-  `requireAdmin()`으로 보호되며, manager-entry와 동일하게 IP당 5분에 10회로 속도 제한된다.
-  `/admin-entry`는 `components/PhoneEntryForm.tsx`(title/description/apiPath/redirectPath를
-  props로 받는 공용 컴포넌트, 기존의 단일 목적 `ManagerEntryForm`을 대체했다)를 렌더한다 —
-  전용 페이지가 남아있는 진입점은 이제 관리자뿐이다(매니저는 아래 참고).
+  (`id`/`phoneNumber` unique/`name`/`pinCode`(nullable)/`createdAt` — `organizationId`가 없다,
+  조직에 속하지 않는 전역 역할이기 때문이다)에 등록된 관리자 전화번호를 보관하며, 이 테이블은 로컬
+  스크립트 `npm run seed:admin -- <전화번호> <이름>`(`scripts/seed-admin.ts`,
+  `lib/server/admins/repository.ts`의 `createAdmin`을 직접 호출한다)으로만 부트스트랩된다 — admin
+  행을 만드는 공개 HTTP 라우트는 없다. 관리자가 `app/admin-entry/page.tsx`에서 전화번호(및 PIN이
+  설정된 계정이면 PIN)를 제출하면 `POST /api/admin-entry`가 `findAdminByPhoneNumber`로 조회하고,
+  일치하면 `lib/server/auth/session.ts`의 `createAdminSession(adminId)`이 매니저와 동일한
+  `hd_session` 쿠키 포맷을 발급한다(다만 `role: 'manager'`/`managerId`/`organizationId` 대신
+  `role: 'admin'`과 `adminId`를 담는다). `requireAdmin()`으로 보호되며, manager-entry와 동일하게
+  IP당 5분에 10회로 속도 제한된다. `/admin-entry`는 `components/PhoneEntryForm.tsx`
+  (title/description/apiPath/redirectPath를 props로 받는 공용 컴포넌트, 기존의 단일 목적
+  `ManagerEntryForm`을 대체했다)를 렌더한다 — 전용 페이지가 남아있는 진입점은 이제 관리자뿐이다
+  (매니저는 아래 참고).
+  - **선택적 PIN**: 대부분의 관리자는 여전히 전화번호만으로 로그인하지만, 계정별로 PIN을 추가해
+    둘 수 있다 — 개인/학습용 프로토타입의 기본 저보안 방침에 대한 관리자 전용 예외다(매니저는
+    영향 없음, 계속 전화번호만). `npm run set-admin-pin -- <전화번호> <PIN>`
+    (`scripts/set-admin-pin.ts` → `lib/server/admins/repository.ts`의
+    `setAdminPinByPhoneNumber`)만이 PIN을 설정하는 경로이며, 이 함수는 평문을 그대로 저장하지
+    않고 `lib/server/admins/pin.ts`의 `hashPin()`(Node 내장 `crypto.scryptSync` + 요청마다 새로
+    생성하는 salt, `salt:hash` 형태 문자열)을 거쳐 `admins.pinCode`에 저장한다. `POST
+    /api/admin-entry`는 조회된 `admin.pinCode`가 값이 있을 때만 `pin` 필드를 요구하고
+    `verifyPin()`(같은 파일, `timingSafeEqual`로 상수 시간 비교)으로 검증한다 — 일치하지 않거나
+    PIN이 아예 없으면 401 `PIN이 올바르지 않습니다.`를 반환하고 세션을 발급하지 않는다.
+    `admin.pinCode`가 `null`인 계정은 이 검사를 건너뛰어 기존 동작 그대로다. admin 행을 그대로
+    반환하는 다른 API가 없으므로(admin-entry 자신도 `{ success: true }`만 응답) 해시가 클라이언트로
+    노출될 경로는 없다.
 - **매니저(manager)**: 관리자와 마찬가지로 Clerk 계정이 없다. `lib/server/db/schema.ts`의 `managers` 테이블
   (`id`/`organizationId` FK/`phoneNumber` unique/`position`/`createdAt`)에 관리자가 등록해둔
   전화번호를 `components/WelcomeScreen.tsx`(첫 화면)에 내장된 입력 폼에 제출하면 `POST
