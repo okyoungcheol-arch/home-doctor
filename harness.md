@@ -171,6 +171,18 @@
     `admin.pinCode`가 `null`인 계정은 이 검사를 건너뛰어 기존 동작 그대로다. admin 행을 그대로
     반환하는 다른 API가 없으므로(admin-entry 자신도 `{ success: true }`만 응답) 해시가 클라이언트로
     노출될 경로는 없다.
+  - **소속단체별 회원현황 조회**: `components/AdminPanel.tsx`의 "소속단체별 회원현황" 섹션에서
+    단체를 고르면 `GET /api/admin/members?organizationId=<id>`(`requireAdmin` 가드,
+    `listMembersForOrganization` 재사용)로 그 단체의 회원 목록을 보여주고, 회원을 클릭하면 `GET
+    /api/admin/members/notable-finding?memberId=<id>`가 신규 `findMemberById`(단체 경계 없이
+    id만으로 조회 — admin은 특정 단체에 속하지 않는 전역 역할이라 매니저용
+    `findMemberInOrganization`과 달리 조직 일치 검사가 없다)로 회원 존재를 확인한 뒤
+    `listRecordsForMember`가 이미 문진일 내림차순으로 정렬해 반환하는 배열의 첫 번째 항목(최신
+    문진 1건)에서 `notableFindings`만 뽑아 반환한다. 화면에는 200자를 넘으면 잘라서("...") 보여주고,
+    기록이 아예 없으면 "특이사항 기록이 없습니다."를 표시한다 — 매니저 대시보드처럼 단체
+    경계로 접근을 제한할 필요가 없으므로(admin은 모든 단체를 볼 수 있는 역할) 두 라우트 모두
+    `organizationId`/`memberId`를 querystring으로만 받는다(다른 admin 라우트와 동일하게 이
+    프로젝트는 동적 `[param]` 라우트 세그먼트를 쓰지 않는다).
 - **매니저(manager)**: 관리자와 마찬가지로 Clerk 계정이 없다. `lib/server/db/schema.ts`의 `managers` 테이블
   (`id`/`organizationId` FK/`phoneNumber` unique/`position`/`createdAt`)에 관리자가 등록해둔
   전화번호를 `components/WelcomeScreen.tsx`(첫 화면)에 내장된 입력 폼에 제출하면 `POST
@@ -213,7 +225,8 @@
   같은 화면의 매니저 전화번호 입력 폼과는 완전히 분리된 별도 버튼이다.
 - `proxy.ts` 미들웨어는 더 이상 존재하지 않는다(삭제됨) — 앱 전체에 미들웨어 기반 라우트 보호가
   없다. admin 라우트(`app/admin/page.tsx`, `app/api/admin/organizations/route.ts`,
-  `app/api/admin/managers/route.ts`)를 포함해 대시보드, 기록 저장, AI 문진 파이프라인
+  `app/api/admin/managers/route.ts`, `app/api/admin/members/route.ts`,
+  `app/api/admin/members/notable-finding/route.ts`)를 포함해 대시보드, 기록 저장, AI 문진 파이프라인
   (`/api/triage`, `/api/specialists`, `/api/interview`, `/api/synthesize`, `/api/intake`) 등
   모든 라우트가 각자의 핸들러 내부에서 `requireAdmin()`/`getViewer()` 등으로 자체적으로 인가를
   수행한다 — 특히 AI 파이프라인 라우트들은 손님도 호출해야 하므로 의도적으로 인증 검사가 전혀

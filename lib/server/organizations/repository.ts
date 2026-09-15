@@ -89,3 +89,14 @@ export async function findMemberInOrganization(
     .where(and(eq(members.id, id), eq(members.organizationId, organizationId)));
   return row ?? null;
 }
+
+/**
+ * 단체 경계 없이 id만으로 회원을 조회한다 — 관리자(admin)는 특정 단체에 속하지 않는 전역
+ * 역할이라, 매니저용 `findMemberInOrganization`과 달리 조직 일치 여부를 검사할 organizationId
+ * 자체가 없다.
+ */
+export async function findMemberById(id: string): Promise<Member | null> {
+  const db = getDb();
+  const [row] = await db.select().from(members).where(eq(members.id, id));
+  return row ?? null;
+}
