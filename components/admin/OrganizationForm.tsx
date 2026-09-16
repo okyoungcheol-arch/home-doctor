@@ -39,7 +39,7 @@ export function OrganizationForm() {
           onChange={(e) => setOrgName(e.target.value)}
           placeholder="단체 이름"
           required
-          className="rounded-8 border border-line-normal p-2 text-sm"
+          className="w-full rounded-8 border border-line-normal p-2 text-sm"
         />
         <button
           type="submit"

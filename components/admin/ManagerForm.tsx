@@ -72,7 +72,7 @@ export function ManagerForm() {
             value={organizationId}
             onChange={(e) => setOrganizationId(e.target.value)}
             required
-            className="rounded-8 border border-line-normal p-2 text-sm"
+            className="w-full rounded-8 border border-line-normal p-2 text-sm"
           >
             {organizations.length === 0 && <option value="">등록된 단체가 없습니다</option>}
             {organizations.map((org) => (
@@ -88,7 +88,7 @@ export function ManagerForm() {
           onChange={(e) => setPhoneNumber(e.target.value)}
           placeholder="전화번호"
           required
-          className="rounded-8 border border-line-normal p-2 text-sm"
+          className="w-full rounded-8 border border-line-normal p-2 text-sm"
         />
         <input
           type="text"
@@ -96,7 +96,7 @@ export function ManagerForm() {
           onChange={(e) => setPosition(e.target.value)}
           placeholder="직위 (예: 원장, 간호사)"
           required
-          className="rounded-8 border border-line-normal p-2 text-sm"
+          className="w-full rounded-8 border border-line-normal p-2 text-sm"
         />
         <button
           type="submit"

@@ -64,7 +64,7 @@ export function PhoneEntryForm({ title, description, apiPath, redirectPath }: Ph
             onChange={(e) => setPhoneNumber(formatPhoneNumber(e.target.value))}
             placeholder="010-1234-5678"
             required
-            className="rounded-8 border border-line-normal p-2 text-sm"
+            className="w-full rounded-8 border border-line-normal p-2 text-sm"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -75,7 +75,7 @@ export function PhoneEntryForm({ title, description, apiPath, redirectPath }: Ph
             value={pin}
             onChange={(e) => setPin(e.target.value)}
             placeholder="선택 입력"
-            className="rounded-8 border border-line-normal p-2 text-sm"
+            className="w-full rounded-8 border border-line-normal p-2 text-sm"
           />
         </label>
         <button

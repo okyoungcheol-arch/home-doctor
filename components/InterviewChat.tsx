@@ -149,7 +149,7 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
             onChange={(event) => setText(event.target.value)}
             placeholder="답변을 입력하세요"
             rows={3}
-            className="rounded-8 border border-line-normal p-2 text-base"
+            className="w-full rounded-8 border border-line-normal p-2 text-base"
           />
 
           <div className="flex items-center gap-3">

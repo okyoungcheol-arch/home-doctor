@@ -195,7 +195,7 @@ function MemberSelectionList() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="이름 또는 전화번호로 검색"
-        className="rounded-8 border border-line-normal p-2 text-sm"
+        className="w-full rounded-8 border border-line-normal p-2 text-sm"
       />
       {status === 'loading' && <p className="text-sm text-label-alternative">불러오는 중입니다...</p>}
       {status === 'error' && <p className="text-sm text-status-negative">회원 목록을 불러오지 못했습니다.</p>}

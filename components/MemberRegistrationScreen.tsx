@@ -86,7 +86,7 @@ export function MemberRegistrationScreen() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="rounded-8 border border-line-normal p-2 text-sm"
+              className="w-full rounded-8 border border-line-normal p-2 text-sm"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
@@ -97,7 +97,7 @@ export function MemberRegistrationScreen() {
               onChange={(e) => setPhoneNumber(formatPhoneNumber(e.target.value))}
               placeholder="010-1234-5678"
               required
-              className="rounded-8 border border-line-normal p-2 text-sm"
+              className="w-full rounded-8 border border-line-normal p-2 text-sm"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
@@ -106,7 +106,7 @@ export function MemberRegistrationScreen() {
               value={ageBand}
               onChange={(e) => setAgeBand(e.target.value)}
               required
-              className="rounded-8 border border-line-normal p-2 text-sm"
+              className="w-full rounded-8 border border-line-normal p-2 text-sm"
             >
               <option value="" disabled>
                 선택해주세요
@@ -124,7 +124,7 @@ export function MemberRegistrationScreen() {
               value={gender}
               onChange={(e) => setGender(e.target.value as Gender)}
               required
-              className="rounded-8 border border-line-normal p-2 text-sm"
+              className="w-full rounded-8 border border-line-normal p-2 text-sm"
             >
               <option value="" disabled>
                 선택해주세요
@@ -142,7 +142,7 @@ export function MemberRegistrationScreen() {
               value={occupation}
               onChange={(e) => setOccupation(e.target.value)}
               required
-              className="rounded-8 border border-line-normal p-2 text-sm"
+              className="w-full rounded-8 border border-line-normal p-2 text-sm"
             >
               <option value="" disabled>
                 선택해주세요

@@ -39,13 +39,18 @@ export function WelcomeScreen() {
       setCheckingAutoLogin(false);
       return;
     }
+    // 자동 로그인이 실패하더라도 저장된 번호를 입력칸에 미리 채워둔다 — 사용자가 처음부터
+    // 다시 타이핑하지 않고 로그인 버튼만 눌러도 되게 한다.
+    setPhoneNumber(saved);
     submitManagerEntry(saved)
       .then((response) => {
         if (response.ok) {
           router.push('/dashboard');
           return;
         }
-        // 등록 취소 등으로 더 이상 유효하지 않은 번호면 기기에서 지우고 평소 화면으로 넘어간다.
+        // 등록 취소 등으로 더 이상 유효하지 않은 번호면 다음 방문부터는 자동 로그인을 다시
+        // 시도하지 않도록 기기에서 지운다 — 다만 입력칸에는 그대로 남겨 사용자가 확인/수정만
+        // 하면 되게 한다.
         localStorage.removeItem(MANAGER_PHONE_STORAGE_KEY);
         setCheckingAutoLogin(false);
       })
@@ -112,7 +117,7 @@ export function WelcomeScreen() {
             onChange={(e) => setPhoneNumber(formatPhoneNumber(e.target.value))}
             placeholder="010-1234-5678"
             required
-            className="rounded-8 border border-line-normal p-2 text-sm"
+            className="w-full rounded-8 border border-line-normal p-2 text-sm"
           />
         </label>
         <button

@@ -131,7 +131,7 @@ export function AdminStatusScreen() {
           <select
             value={orgId}
             onChange={(e) => setOrgId(e.target.value)}
-            className="rounded-8 border border-line-normal p-2 text-sm"
+            className="w-full rounded-8 border border-line-normal p-2 text-sm"
           >
             {organizations.length === 0 && <option value="">등록된 단체가 없습니다</option>}
             {organizations.map((org) => (
