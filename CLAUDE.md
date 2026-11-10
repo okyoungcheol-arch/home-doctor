@@ -47,7 +47,11 @@
   /api/admin-entry`가 `pin` 필드까지 함께 검증한다(`lib/server/admins/pin.ts`의 `verifyPin`,
   `scryptSync` 해시 비교). PIN은 `npm run set-admin-pin -- <전화번호> <PIN>` 스크립트로만
   설정하며(`lib/server/admins/repository.ts`의 `setAdminPinByPhoneNumber`가 평문이 아니라 해시를
-  저장), PIN이 없는 관리자는 기존과 동일하게 전화번호만으로 로그인한다. 회원은 매니저가 이름·전화번호·성별·연령대·직업을 모두 입력해 등록해두는 대상이며
+  저장), PIN이 없는 관리자는 기존과 동일하게 전화번호만으로 로그인한다. 관리자는 모든 단체에
+  대해 매니저 권한도 가진다 — `/dashboard`에서 단체를 고르면(`POST
+  /api/admin/select-organization` → 세션의 `organizationId`) 그 단체의 회원 등록·회원 선택·문진
+  저장을 매니저와 동일하게 할 수 있다(`requireManager`/`requireMember`는 역할이 아니라 세션의
+  `organizationId`/`activeMemberId` 유무로 판정). 회원은 매니저가 이름·전화번호·성별·연령대·직업을 모두 입력해 등록해두는 대상이며
   (`members` 테이블), 매니저가 `/dashboard`에서 회원을 선택하면 세션에 `activeMemberId`가 추가되어
   그 회원 명의로 문진이 진행된다 — 연령대/성별/직업은 트리아지·전문의 1차 분석 프롬프트에도
   전달된다(이름·전화번호는 전달하지 않음). 손님은 세션 없이 즉시 문진을 시작할 수 있지만 결과는

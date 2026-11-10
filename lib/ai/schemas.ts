@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-export const suspectedConditionSchema = z.object({
+const suspectedConditionSchema = z.object({
   name: z.string().describe('의심되는 질환명 (한국어)'),
   confidence: z.number().min(0).max(1).describe('확신도 0~1'),
   rationale: z.string().describe('이 질환을 의심하는 근거'),
 });
 
-export const followUpQuestionSchema = z.object({
+const followUpQuestionSchema = z.object({
   question: z.string().describe('환자에게 물어볼 질문. 반드시 한국어(존댓말)로만, 맞춤법에 맞게 작성'),
   options: z
     .array(z.string())
@@ -29,7 +29,7 @@ export const specialistFindingsSchema = z.object({
       '음식·생활습관 관련 주의사항이나 추가로 확인이 필요한 의학적 소견을 짧은 문구 1~3개로 간략히. 해당 사항이 없으면 생략 가능',
     ),
 });
-export type SpecialistFindings = z.infer<typeof specialistFindingsSchema>;
+type SpecialistFindings = z.infer<typeof specialistFindingsSchema>;
 
 export type SpecialistOpinion = SpecialistFindings & {
   specialtyId: string;

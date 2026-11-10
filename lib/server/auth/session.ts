@@ -1,9 +1,13 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
+// 관리자는 특정 단체에 속하지 않는 전역 역할이지만, 매니저 권한(회원 등록/선택/문진 저장)도 함께
+// 가진다 — 이때 "어느 단체의 매니저처럼 행동할지"를 `organizationId`로 세션에 기록한다(매니저의
+// 고정 소속과 달리 관리자가 언제든 바꿀 수 있는 선택값). `activeMemberId`는 그 단체 안에서 고른
+// 회원이므로 `organizationId` 없이 단독으로 존재할 수 없다.
 export type SessionPayload =
   | { role: 'manager'; managerId: string; organizationId: string; activeMemberId?: string }
-  | { role: 'admin'; adminId: string };
+  | { role: 'admin'; adminId: string; organizationId?: string; activeMemberId?: string };
 
 export const SESSION_COOKIE_NAME = 'hd_session';
 
@@ -25,18 +29,23 @@ function isSessionPayload(value: unknown): value is SessionPayload {
   }
   const candidate = value as Record<string, unknown>;
 
+  if (candidate.activeMemberId !== undefined && typeof candidate.activeMemberId !== 'string') {
+    return false;
+  }
+
   if (candidate.role === 'admin') {
-    return typeof candidate.adminId === 'string';
+    if (typeof candidate.adminId !== 'string') {
+      return false;
+    }
+    if (candidate.organizationId !== undefined && typeof candidate.organizationId !== 'string') {
+      return false;
+    }
+    // 단체를 고르지 않은 채 회원만 선택된 세션은 만들어질 수 없는 상태다.
+    return candidate.activeMemberId === undefined || candidate.organizationId !== undefined;
   }
 
   if (candidate.role === 'manager') {
-    if (typeof candidate.managerId !== 'string' || typeof candidate.organizationId !== 'string') {
-      return false;
-    }
-    if (candidate.activeMemberId !== undefined && typeof candidate.activeMemberId !== 'string') {
-      return false;
-    }
-    return true;
+    return typeof candidate.managerId === 'string' && typeof candidate.organizationId === 'string';
   }
 
   return false;
@@ -74,14 +83,20 @@ export async function decodeSessionToken(token: string): Promise<SessionPayload 
     if (!isSessionPayload(payload)) {
       return null;
     }
+    // JWT 표준 클레임(iat/exp)이 섞이지 않도록 세션 필드만 골라 새 객체로 만든다.
+    let result: SessionPayload;
     if (payload.role === 'admin') {
-      return { role: 'admin', adminId: payload.adminId };
+      result = { role: 'admin', adminId: payload.adminId };
+      if (payload.organizationId !== undefined) {
+        result.organizationId = payload.organizationId;
+      }
+    } else {
+      result = {
+        role: 'manager',
+        managerId: payload.managerId,
+        organizationId: payload.organizationId,
+      };
     }
-    const result: SessionPayload = {
-      role: 'manager',
-      managerId: payload.managerId,
-      organizationId: payload.organizationId,
-    };
     if (payload.activeMemberId !== undefined) {
       result.activeMemberId = payload.activeMemberId;
     }
@@ -106,18 +121,14 @@ function sessionCookieOptions() {
  * 매니저 로그인 성공 시 서명된 세션 쿠키를 발급한다.
  */
 export async function createManagerSession(managerId: string, organizationId: string): Promise<void> {
-  const token = await encodeSessionToken({ role: 'manager', managerId, organizationId });
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
+  await writeSession({ role: 'manager', managerId, organizationId });
 }
 
 /**
  * 관리자 로그인 성공 시 서명된 세션 쿠키를 발급한다.
  */
 export async function createAdminSession(adminId: string): Promise<void> {
-  const token = await encodeSessionToken({ role: 'admin', adminId });
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
+  await writeSession({ role: 'admin', adminId });
 }
 
 /**
@@ -142,34 +153,52 @@ export async function clearSession(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE_NAME);
 }
 
-/**
- * 매니저가 특정 회원을 선택했을 때 세션에 활성 회원을 기록한다. 유효한 매니저 세션이
- * 없으면(세션이 없거나 admin 세션이면) 예외를 던진다(호출 전에 라우트 핸들러가 매니저 인증을
- * 확인했어야 한다).
- */
-export async function setActiveMember(memberId: string): Promise<void> {
-  const session = await readSession();
-  if (!session || session.role !== 'manager') {
-    throw new Error('활성 매니저 세션이 없습니다.');
-  }
-  const token = await encodeSessionToken({ ...session, activeMemberId: memberId });
+async function writeSession(payload: SessionPayload): Promise<void> {
+  const token = await encodeSessionToken(payload);
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
 }
 
 /**
- * 세션에서 활성 회원 선택을 해제한다. 유효한 매니저 세션이 없으면 예외를 던진다.
+ * 매니저 권한으로 행동 중인 세션(매니저, 또는 단체를 선택한 관리자)을 읽는다. 해당하지 않으면
+ * 예외를 던진다(호출 전에 라우트 핸들러가 `requireManager`로 인증을 확인했어야 한다).
  */
-export async function clearActiveMember(): Promise<void> {
+async function readManagingSession(): Promise<SessionPayload & { organizationId: string }> {
   const session = await readSession();
-  if (!session || session.role !== 'manager') {
+  if (!session || session.organizationId === undefined) {
     throw new Error('활성 매니저 세션이 없습니다.');
   }
-  const token = await encodeSessionToken({
-    role: 'manager',
-    managerId: session.managerId,
-    organizationId: session.organizationId,
-  });
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
+  return { ...session, organizationId: session.organizationId };
+}
+
+/**
+ * 특정 회원을 선택했을 때 세션에 활성 회원을 기록한다. 매니저 세션이거나 단체를 선택한 관리자
+ * 세션이어야 하며, 아니면 예외를 던진다.
+ */
+export async function setActiveMember(memberId: string): Promise<void> {
+  const session = await readManagingSession();
+  await writeSession({ ...session, activeMemberId: memberId });
+}
+
+/**
+ * 세션에서 활성 회원 선택을 해제한다(로그인 신원과 단체 선택은 유지). 매니저 권한으로 행동 중인
+ * 세션이 없으면 예외를 던진다.
+ */
+export async function clearActiveMember(): Promise<void> {
+  const session = await readManagingSession();
+  const next = { ...session };
+  delete next.activeMemberId;
+  await writeSession(next);
+}
+
+/**
+ * 관리자가 매니저 권한으로 행동할 단체를 선택(또는 변경)한다. 활성 회원은 이전 단체 소속이므로
+ * 함께 해제한다. 관리자 세션이 아니면 예외를 던진다 — 매니저의 소속 단체는 바꿀 수 없다.
+ */
+export async function setActingOrganization(organizationId: string): Promise<void> {
+  const session = await readSession();
+  if (!session || session.role !== 'admin') {
+    throw new Error('관리자 세션이 없습니다.');
+  }
+  await writeSession({ role: 'admin', adminId: session.adminId, organizationId });
 }

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const viewer = await getViewer();
   let pastRecordsSummary: string | null = null;
-  if (viewer.role === 'manager' && viewer.activeMemberId) {
+  if (viewer.activeMemberId) {
     const pastRecords = await listRecordsForMember(viewer.activeMemberId);
     if (pastRecords.length > 0) {
       pastRecordsSummary = pastRecords

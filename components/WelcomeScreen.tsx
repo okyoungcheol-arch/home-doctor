@@ -26,37 +26,48 @@ export function WelcomeScreen() {
   const [checkingAutoLogin, setCheckingAutoLogin] = useState(true);
 
   useEffect(() => {
-    // 시크릿 모드/스토리지 차단 브라우저에서는 localStorage 접근 자체가 예외를 던질 수 있다 —
-    // 이 경우 자동 로그인을 그냥 건너뛰고 평소 화면(전화번호 입력)으로 진행한다.
-    let saved: string | null = null;
-    try {
-      saved = localStorage.getItem(MANAGER_PHONE_STORAGE_KEY);
-    } catch {
-      setCheckingAutoLogin(false);
-      return;
-    }
-    if (!saved) {
-      setCheckingAutoLogin(false);
-      return;
-    }
-    // 자동 로그인이 실패하더라도 저장된 번호를 입력칸에 미리 채워둔다 — 사용자가 처음부터
-    // 다시 타이핑하지 않고 로그인 버튼만 눌러도 되게 한다.
-    setPhoneNumber(saved);
-    submitManagerEntry(saved)
-      .then((response) => {
-        if (response.ok) {
-          router.push('/dashboard');
-          return;
+    let cancelled = false;
+
+    async function tryAutoLogin() {
+      // 시크릿 모드/스토리지 차단 브라우저에서는 localStorage 접근 자체가 예외를 던질 수 있다 —
+      // 이 경우 자동 로그인을 그냥 건너뛰고 평소 화면(전화번호 입력)으로 진행한다.
+      let saved: string | null = null;
+      try {
+        saved = localStorage.getItem(MANAGER_PHONE_STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+
+      if (saved) {
+        try {
+          const response = await submitManagerEntry(saved);
+          if (cancelled) return;
+          if (response.ok) {
+            router.push('/dashboard');
+            return;
+          }
+          // 등록 취소로 더 이상 유효하지 않은 번호(404)면 다음 방문부터는 자동 로그인을 다시
+          // 시도하지 않도록 기기에서 지운다. 요청 제한(429)이나 서버 오류 같은 일시적 실패에서는
+          // 지우지 않는다 — 번호 자체는 여전히 유효하다.
+          if (response.status === 404) {
+            localStorage.removeItem(MANAGER_PHONE_STORAGE_KEY);
+          }
+        } catch {
+          // ignore — 네트워크 오류 등은 평소 화면으로 넘어가 직접 로그인하게 한다
         }
-        // 등록 취소 등으로 더 이상 유효하지 않은 번호면 다음 방문부터는 자동 로그인을 다시
-        // 시도하지 않도록 기기에서 지운다 — 다만 입력칸에는 그대로 남겨 사용자가 확인/수정만
-        // 하면 되게 한다.
-        localStorage.removeItem(MANAGER_PHONE_STORAGE_KEY);
-        setCheckingAutoLogin(false);
-      })
-      .catch(() => {
-        setCheckingAutoLogin(false);
-      });
+        if (cancelled) return;
+        // 자동 로그인이 실패하더라도 저장된 번호를 입력칸에 미리 채워둔다 — 사용자가 처음부터
+        // 다시 타이핑하지 않고 로그인 버튼만 눌러도 되게 한다.
+        setPhoneNumber(saved);
+      }
+
+      if (!cancelled) setCheckingAutoLogin(false);
+    }
+
+    void tryAutoLogin();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   async function handleManagerLogin(event: FormEvent) {

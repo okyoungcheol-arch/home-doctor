@@ -48,11 +48,11 @@
   텍스트로 정리한다.
 - `combinedTranscript`는 이후 파이프라인(트리아지 이하)에 예전의 단일 "전사문" 자리에 그대로
   전달되는 동일한 계약을 따른다 — 트리아지/전문의 프롬프트 계약은 바뀌지 않았다.
-- `app/api/transcribe/route.ts`(단일 파일을 MIME 타입으로 분기해 전사/문서 분석하던 옛 경로)는
-  최초 업로드 단계에서는 더 이상 쓰이지 않는다 — `/api/intake`가 그 역할을 대체했다. 다만 완전히
-  죽은 경로는 아니다: `components/InterviewChat.tsx`가 통합 문진 루프(§6) 중 답변을 음성으로
-  녹음할 때마다 이 라우트를 그대로 호출해 전사한다. 즉 `/api/intake`는 초기 업로드만, `/api/transcribe`는
-  문진 중 음성 답변만 처리하는 두 개의 별도 활성 경로다.
+- `app/api/transcribe/route.ts`는 최초 업로드 단계에서는 쓰이지 않는다 — `/api/intake`가 그 역할을
+  맡는다. `components/InterviewChat.tsx`가 통합 문진 루프(§6) 중 답변을 음성으로 녹음할 때마다 이
+  라우트를 호출해 전사한다. 즉 `/api/intake`는 초기 업로드만, `/api/transcribe`는 문진 중 음성
+  답변만 처리하는 두 개의 별도 활성 경로다. 예전에 있던 이미지/PDF 분기(문서 분석)는 호출하는 곳이
+  없어 제거했고, 이제 `audio/*`(최대 25MB)만 받는다.
 
 ### 2. 트리아지 — 구현됨
 
@@ -209,6 +209,22 @@
       필요가 없으므로(admin은 모든 단체를 볼 수 있는 역할) 이 절의 모든 라우트가
       `organizationId`/`memberId`/`managerId`를 querystring으로만 받는다(다른 admin 라우트와
       동일하게 이 프로젝트는 동적 `[param]` 라우트 세그먼트를 쓰지 않는다).
+  - **관리자의 매니저 권한(단체 선택)**: 관리자는 모든 단체에 대해 매니저 권한(회원 등록·회원
+    선택·기록 보기·문진 저장)도 가진다. 관리자 세션 페이로드는 `{ role: 'admin', adminId,
+    organizationId?, activeMemberId? }`이며, `organizationId`는 "지금 어느 단체의 매니저처럼
+    행동하는지"를 뜻하는 선택값이다(매니저의 고정 소속과 달리 언제든 바꿀 수 있다).
+    `app/dashboard/layout.tsx`가 관리자에게만 `components/admin/ActingOrganizationSelect.tsx`
+    (전체 단체 콤보)를 띄우고, 선택하면 `POST /api/admin/select-organization`(`requireAdmin` →
+    `findOrganizationById`로 존재 확인 → `setActingOrganization`)이 세션에 단체를 기록한 뒤
+    `router.refresh()`로 레이아웃을 다시 그린다(하위 화면은 `key={organizationId}`로 다시 마운트).
+    단체를 바꾸면 이전 단체에서 고른 `activeMemberId`는 함께 해제된다. `requireManager()`/
+    `requireMember()`는 역할이 아니라 "세션에 `organizationId`(및 `activeMemberId`)가 있는가"로
+    판정하므로 `/api/dashboard/*`·`/api/records`·`getPatientProfile()`·`/api/synthesize`의 과거 기록
+    요약이 매니저와 동일한 코드 경로로 동작하고, 회원 조회는 여전히 항상
+    `findMemberInOrganization(…, organizationId)`로 단체 하나에 한정된다. 단체를 고르지 않은
+    관리자는 매니저 전용 라우트에서 403을 받는다. `/`는 회원을 선택한 관리자에게 문진 화면을,
+    아니면 `/admin`으로의 redirect를 준다. `AdminNav`의 "회원 문진"과 `DashboardNav`의 "관리자
+    메뉴" 링크로 두 화면을 오간다.
 - **매니저(manager)**: 관리자와 마찬가지로 Clerk 계정이 없다. `lib/server/db/schema.ts`의 `managers` 테이블
   (`id`/`organizationId` FK/`phoneNumber` unique/`position`/`createdAt`)에 관리자가 등록해둔
   전화번호를 `components/WelcomeScreen.tsx`(첫 화면)에 내장된 입력 폼에 제출하면 `POST
@@ -395,3 +411,10 @@ Clerk Organizations 모델을 설명하며 위 내용으로 대체되었지만, 
   계속 보인다.
 - 서비스 워커/오프라인 캐싱은 구현하지 않는다 — 요청 범위는 설치 가능성까지이며 오프라인 지원은
   별도 범위 밖 결정이다.
+- **배포 업데이트 알림**: 서비스 워커가 없어 새로고침만 하면 최신 배포가 로드되지만, 설치된 앱은
+  새로고침 버튼이 없고 며칠씩 닫히지 않는다. `components/UpdateNotifier.tsx`(`app/layout.tsx`에
+  마운트)가 `GET /api/version`(`VERCEL_DEPLOYMENT_ID` → `VERCEL_GIT_COMMIT_SHA` → `'local'`,
+  `force-dynamic` + `no-store`)을 마운트 시 한 번 읽어 "로드된 버전"으로 삼고, 앱이 다시 보일
+  때(`visibilitychange`)와 5분마다 다시 읽어 값이 달라지면 화면 하단에 "새 버전이 배포되었습니다 ·
+  업데이트" 배너를 띄운다. 버튼은 `window.location.reload()`만 한다 — 진행 중인 문진 state가
+  사라지지 않도록 자동 새로고침은 하지 않는다.

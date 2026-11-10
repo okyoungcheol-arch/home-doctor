@@ -26,10 +26,28 @@ describe('getPatientProfile', () => {
     expect(findMemberInOrganizationMock).not.toHaveBeenCalled();
   });
 
-  it('returns null for an admin session', async () => {
+  it('returns null for an admin session with no member selected', async () => {
     readSessionMock.mockResolvedValue({ role: 'admin', adminId: 'admin_1' });
     expect(await getPatientProfile()).toBeNull();
     expect(findMemberInOrganizationMock).not.toHaveBeenCalled();
+  });
+
+  it('reads the profile of the member an admin selected, scoped to the acting organization', async () => {
+    readSessionMock.mockResolvedValue({
+      role: 'admin',
+      adminId: 'admin_1',
+      organizationId: 'org_2',
+      activeMemberId: 'member_9',
+    });
+    findMemberInOrganizationMock.mockResolvedValue({
+      id: 'member_9',
+      organizationId: 'org_2',
+      ageBand: '60~64세',
+      gender: 'male',
+      occupation: '농업',
+    });
+    expect(await getPatientProfile()).toEqual({ ageBand: '60~64세', gender: 'male', occupation: '농업' });
+    expect(findMemberInOrganizationMock).toHaveBeenCalledWith('member_9', 'org_2');
   });
 
   it('returns null for a manager session with no activeMemberId', async () => {

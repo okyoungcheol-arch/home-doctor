@@ -22,7 +22,7 @@ const SEVERITY_LABEL_BY_LEVEL: Record<number, string> = {
 };
 
 /** 기록이 없거나(신규 회원) 이 필드가 생기기 전에 저장된 기존 기록이면 회색으로 "미평가"를 표시한다. */
-export const SEVERITY_UNASSESSED_COLOR = 'var(--atomic-coolNeutral-70)';
+const SEVERITY_UNASSESSED_COLOR = 'var(--atomic-coolNeutral-70)';
 const SEVERITY_UNASSESSED_LABEL = '미평가';
 
 export function getSeverityColor(level: number | null | undefined): string {

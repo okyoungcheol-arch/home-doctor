@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { InstallButton } from "@/components/InstallButton";
+import { UpdateNotifier } from "@/components/UpdateNotifier";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <InstallButton />
         </div>
         {children}
+        <UpdateNotifier />
       </body>
     </html>
   );

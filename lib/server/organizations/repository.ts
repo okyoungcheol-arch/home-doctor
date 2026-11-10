@@ -34,6 +34,12 @@ export async function listOrganizations(): Promise<Organization[]> {
   return db.select().from(organizations).orderBy(asc(organizations.name));
 }
 
+export async function findOrganizationById(id: string): Promise<Organization | null> {
+  const db = getDb();
+  const [row] = await db.select().from(organizations).where(eq(organizations.id, id));
+  return row ?? null;
+}
+
 export async function createManager(input: NewManager): Promise<Manager> {
   const db = getDb();
   const [row] = await db

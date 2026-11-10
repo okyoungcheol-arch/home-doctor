@@ -83,6 +83,16 @@ describe('requireManager', () => {
     });
     await expect(requireManager()).resolves.toMatchObject({ role: 'manager', organizationId: 'org_1' });
   });
+
+  it('throws for an admin who has not selected an organization', async () => {
+    readSessionMock.mockResolvedValue({ role: 'admin', adminId: 'admin_1' });
+    await expect(requireManager()).rejects.toThrow(AuthorizationError);
+  });
+
+  it('resolves for an admin acting in a selected organization', async () => {
+    readSessionMock.mockResolvedValue({ role: 'admin', adminId: 'admin_1', organizationId: 'org_2' });
+    await expect(requireManager()).resolves.toMatchObject({ role: 'admin', organizationId: 'org_2' });
+  });
 });
 
 describe('requireMember', () => {
@@ -108,5 +118,25 @@ describe('requireMember', () => {
       activeMemberId: 'member_1',
     });
     await expect(requireMember()).resolves.toMatchObject({ role: 'manager', activeMemberId: 'member_1' });
+  });
+
+  it('throws for an admin with an organization but no active member', async () => {
+    readSessionMock.mockResolvedValue({ role: 'admin', adminId: 'admin_1', organizationId: 'org_2' });
+    await expect(requireMember()).rejects.toThrow(AuthorizationError);
+  });
+
+  it('resolves for an admin with an organization and an active member selected', async () => {
+    readSessionMock.mockResolvedValue({
+      role: 'admin',
+      adminId: 'admin_1',
+      organizationId: 'org_2',
+      activeMemberId: 'member_9',
+    });
+    await expect(requireMember()).resolves.toEqual({
+      role: 'admin',
+      adminId: 'admin_1',
+      organizationId: 'org_2',
+      activeMemberId: 'member_9',
+    });
   });
 });

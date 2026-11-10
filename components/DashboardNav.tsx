@@ -3,12 +3,15 @@
 import Link from 'next/link';
 import { MANAGER_PHONE_STORAGE_KEY } from '@/lib/phone';
 
-export function DashboardNav() {
+export function DashboardNav({ isAdmin = false }: { isAdmin?: boolean }) {
   async function handleSwitchAccount() {
-    try {
-      localStorage.removeItem(MANAGER_PHONE_STORAGE_KEY);
-    } catch {
-      // ignore — 스토리지 접근이 막혀 있어도 이동 자체는 진행한다
+    // 관리자 로그인은 자동 로그인 값을 쓰지 않는다 — 이 기기에 저장된 매니저 번호는 건드리지 않는다.
+    if (!isAdmin) {
+      try {
+        localStorage.removeItem(MANAGER_PHONE_STORAGE_KEY);
+      } catch {
+        // ignore — 스토리지 접근이 막혀 있어도 이동 자체는 진행한다
+      }
     }
     try {
       // 서버 세션 쿠키까지 지워야 한다 — 안 지우면 '/'로 이동해도 매니저 세션이 남아 있어
@@ -29,6 +32,11 @@ export function DashboardNav() {
         <Link href="/dashboard/register" className="font-medium hover:text-primary-normal">
           회원 등록
         </Link>
+        {isAdmin && (
+          <Link href="/admin" className="font-medium hover:text-primary-normal">
+            관리자 메뉴
+          </Link>
+        )}
       </div>
       <button
         type="button"

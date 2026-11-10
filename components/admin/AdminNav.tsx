@@ -26,6 +26,9 @@ export function AdminNav() {
         <Link href="/admin/status" className="font-medium hover:text-primary-normal">
           단체별 조회
         </Link>
+        <Link href="/dashboard" className="font-medium hover:text-primary-normal">
+          회원 문진
+        </Link>
       </div>
       <button
         type="button"
