@@ -11,6 +11,7 @@ import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { EmergencyBanner } from '@/components/EmergencyBanner';
 import { mergeQuestions, normalize, isSimilar, type QueuedQuestion } from '@/lib/interview/mergeQuestions';
 import type { SpecialistOpinion, SynthesisReport as SynthesisReportType } from '@/lib/ai/schemas';
+import { useBlockAutoUpdate } from '@/lib/client/updateGuard';
 
 type Stage =
   | 'upload'
@@ -53,6 +54,9 @@ export function InterviewApp({ canSave }: { canSave: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [saveWarning, setSaveWarning] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'skipped'>('idle');
+
+  // 문진이 시작된 뒤(분석 중 ~ 종합 소견 열람)에는 새 배포가 있어도 자동 새로고침하지 않는다.
+  useBlockAutoUpdate(stage !== 'upload');
 
   // Bumped by handleReset so any async handler still in flight (fetches can take up to
   // maxDuration = 60s) can tell its own session has been abandoned and skip its setState calls.

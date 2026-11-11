@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { InstallButton } from "@/components/InstallButton";
 import { UpdateNotifier } from "@/components/UpdateNotifier";
+import { getDeploymentVersion } from "@/lib/version";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -41,7 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <InstallButton />
         </div>
         {children}
-        <UpdateNotifier />
+        <UpdateNotifier loadedVersion={getDeploymentVersion()} />
       </body>
     </html>
   );

@@ -3,6 +3,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import type { QueuedQuestion } from '@/lib/interview/mergeQuestions';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { buildRecording, createSpeechRecorder, readErrorMessage } from '@/lib/audio/recording';
 
 export type AnswerAttachment = { data: string; mediaType: string; filename?: string };
 
@@ -46,21 +47,31 @@ export function InterviewChat({ currentQuestion, onAnswer }: InterviewChatProps)
       return;
     }
 
-    const recorder = new MediaRecorder(stream);
+    const recorder = createSpeechRecorder(stream);
     chunksRef.current = [];
-    recorder.ondataavailable = (event) => chunksRef.current.push(event.data);
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunksRef.current.push(event.data);
+    };
     recorder.onstop = async () => {
       stream.getTracks().forEach((track) => track.stop());
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      const { blob, filename } = buildRecording(chunksRef.current, recorder.mimeType);
+      if (blob.size === 0) {
+        setErrorMessage('녹음된 소리가 없습니다. 다시 녹음해 주세요.');
+        return;
+      }
       const formData = new FormData();
-      formData.append('audio', blob, 'answer.webm');
+      formData.append('audio', blob, filename);
+      const fallback = '음성 인식에 실패했습니다. 다시 시도해주세요.';
       try {
         const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
-        if (!response.ok) throw new Error('음성 인식에 실패했습니다.');
+        if (!response.ok) {
+          setErrorMessage(await readErrorMessage(response, fallback));
+          return;
+        }
         const data = await response.json();
         setText((prev) => (prev ? `${prev} ${data.text}` : data.text));
       } catch {
-        setErrorMessage('음성 인식에 실패했습니다. 다시 시도해주세요.');
+        setErrorMessage(fallback);
       }
     };
     recorder.start();

@@ -1,6 +1,8 @@
 'use client';
 
 import { useRef, useState, type ChangeEvent } from 'react';
+import { buildRecording, createSpeechRecorder, readErrorMessage } from '@/lib/audio/recording';
+import { useBlockAutoUpdate } from '@/lib/client/updateGuard';
 
 type IntakeResult = {
   documentTexts: string[];
@@ -16,13 +18,16 @@ const MAX_DOCUMENTS = 2;
 
 export function UploadPanel({ onComplete }: UploadPanelProps) {
   const [documents, setDocuments] = useState<File[]>([]);
-  const [stagedAudio, setStagedAudio] = useState<Blob | null>(null);
+  const [stagedAudio, setStagedAudio] = useState<{ blob: Blob; filename: string } | null>(null);
   const [truncationNotice, setTruncationNotice] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'submitting' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  // 녹음 중이거나 아직 보내지 않은 녹음이 있으면 자동 업데이트(새로고침)로 사라지지 않게 한다.
+  useBlockAutoUpdate(isRecording || stagedAudio !== null || status === 'submitting');
 
   function handleDocumentChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -44,13 +49,20 @@ export function UploadPanel({ onComplete }: UploadPanelProps) {
       return;
     }
 
-    const recorder = new MediaRecorder(stream);
+    const recorder = createSpeechRecorder(stream);
     chunksRef.current = [];
-    recorder.ondataavailable = (event) => chunksRef.current.push(event.data);
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunksRef.current.push(event.data);
+    };
     recorder.onstop = () => {
       stream.getTracks().forEach((track) => track.stop());
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      setStagedAudio(blob);
+      const recording = buildRecording(chunksRef.current, recorder.mimeType);
+      if (recording.blob.size === 0) {
+        setStagedAudio(null);
+        setErrorMessage('녹음된 소리가 없습니다. 다시 녹음해 주세요.');
+        return;
+      }
+      setStagedAudio(recording);
     };
     recorder.start();
     mediaRecorderRef.current = recorder;
@@ -68,12 +80,12 @@ export function UploadPanel({ onComplete }: UploadPanelProps) {
 
     const formData = new FormData();
     documents.forEach((file) => formData.append('documents', file, file.name));
-    if (stagedAudio) formData.append('audio', stagedAudio, 'recording.webm');
+    if (stagedAudio) formData.append('audio', stagedAudio.blob, stagedAudio.filename);
 
     try {
       const response = await fetch('/api/intake', { method: 'POST', body: formData });
+      if (!response.ok) throw new Error(await readErrorMessage(response, '분석 요청이 실패했습니다.'));
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? '분석 요청이 실패했습니다.');
       onComplete({
         documentTexts: data.documentTexts,
         recordingText: data.recordingText,
@@ -121,7 +133,7 @@ export function UploadPanel({ onComplete }: UploadPanelProps) {
 
       {isRecording && <p className="text-sm text-label-alternative">녹음 중입니다...</p>}
       {status === 'submitting' && <p className="text-sm text-label-alternative">분석을 준비하는 중입니다...</p>}
-      {status === 'error' && <p className="text-sm text-status-negative">{errorMessage}</p>}
+      {errorMessage && <p className="text-sm text-status-negative">{errorMessage}</p>}
 
       <button
         type="button"

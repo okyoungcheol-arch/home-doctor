@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/lib/ai/transcription', () => ({
+vi.mock('@/lib/ai/transcription', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/ai/transcription')>()),
   transcribeAudio: vi.fn(async () => ({ text: '녹음 전사 결과', language: 'ko', durationInSeconds: 3 })),
 }));
 

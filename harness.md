@@ -411,10 +411,15 @@ Clerk Organizations 모델을 설명하며 위 내용으로 대체되었지만, 
   계속 보인다.
 - 서비스 워커/오프라인 캐싱은 구현하지 않는다 — 요청 범위는 설치 가능성까지이며 오프라인 지원은
   별도 범위 밖 결정이다.
-- **배포 업데이트 알림**: 서비스 워커가 없어 새로고침만 하면 최신 배포가 로드되지만, 설치된 앱은
-  새로고침 버튼이 없고 며칠씩 닫히지 않는다. `components/UpdateNotifier.tsx`(`app/layout.tsx`에
-  마운트)가 `GET /api/version`(`VERCEL_DEPLOYMENT_ID` → `VERCEL_GIT_COMMIT_SHA` → `'local'`,
-  `force-dynamic` + `no-store`)을 마운트 시 한 번 읽어 "로드된 버전"으로 삼고, 앱이 다시 보일
-  때(`visibilitychange`)와 5분마다 다시 읽어 값이 달라지면 화면 하단에 "새 버전이 배포되었습니다 ·
-  업데이트" 배너를 띄운다. 버튼은 `window.location.reload()`만 한다 — 진행 중인 문진 state가
-  사라지지 않도록 자동 새로고침은 하지 않는다.
+- **배포 자동 업데이트**: 서비스 워커가 없어 새로고침만 하면 최신 배포가 로드되지만, 설치된 앱은
+  새로고침 버튼이 없고 며칠씩 닫히지 않는다. `app/layout.tsx`가 자신을 렌더링한 배포의 식별자
+  (`lib/version.ts`의 `getDeploymentVersion` — `VERCEL_DEPLOYMENT_ID` → `VERCEL_GIT_COMMIT_SHA` →
+  `'local'`)를 `components/UpdateNotifier.tsx`에 `loadedVersion`으로 넘기고, 이 컴포넌트가
+  `GET /api/version`(같은 함수, `force-dynamic` + `no-store`)과 비교한다. 앱을 열었을 때(마운트)와
+  다시 꺼냈을 때(`visibilitychange`) 값이 다르면 **자동으로 `window.location.reload()`** 한다. 단
+  새로고침하면 메모리의 작업이 사라지므로 `lib/client/updateGuard.ts`의 `isAutoUpdateSafe()`가
+  false면(— `useBlockAutoUpdate`로 표시된 진행 중 문진·미전송 녹음, 또는 값이 입력된 폼 필드가
+  있을 때) 자동 새로고침 대신 화면 하단에 "새 버전이 배포되었습니다 · 업데이트" 배너를 띄운다.
+  5분 주기 확인에서 발견된 경우도 보고 있는 화면이 갑자기 바뀌지 않도록 배너만 띄운다. 같은
+  버전으로의 자동 새로고침은 `sessionStorage`(`hd_update_attempted`)에 기록해 한 번만 시도한다
+  (무한 새로고침 방지).

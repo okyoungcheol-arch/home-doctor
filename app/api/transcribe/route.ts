@@ -1,4 +1,4 @@
-import { transcribeAudio } from '@/lib/ai/transcription';
+import { describeConversionError, transcribeAudio } from '@/lib/ai/transcription';
 
 export const maxDuration = 60;
 
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     return Response.json(result);
   } catch (error) {
     console.error('transcribe error', error);
-    return Response.json({ error: '파일을 텍스트로 변환하지 못했습니다.' }, { status: 502 });
+    const { status, error: message } = describeConversionError(error);
+    return Response.json({ error: message }, { status });
   }
 }
